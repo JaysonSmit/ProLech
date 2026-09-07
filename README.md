@@ -1,54 +1,86 @@
-This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
+﻿# ProLech — Sistema de Gestión para el Acopio de Leche
 
-* [/app/iosApp](./app/iosApp/iosApp) contains an iOS application. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+Aplicación multiplataforma para gestionar y auditar el proceso de acopio de leche, desde la recolección en campo con los productores hasta su recepción y evaluación en planta.
 
-* [/app/shared](./app/shared/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./app/shared/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./app/shared/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./app/shared/src/jvmMain/kotlin)
-    folder is the appropriate location.
+## Problema que resuelve
 
-* [/core](./core/src) is for the code that will be shared between all targets in the project.
-  The most important subfolder is [commonMain](./core/src/commonMain/kotlin). If preferred, you
-  can add code to the platform-specific folders here too.
+Las empresas dedicadas al acopio de leche trabajan con diversos productores de la zona de Juliaca y la región, realizando actividades logísticas de recolección, traslado y recepción. Gran parte de esta información se registra manualmente o se encuentra dispersa, lo que dificulta el control riguroso de los productores, las cantidades exactas recolectadas, las rutas y las incidencias durante el proceso.
 
-* [/server](./server/src/main/kotlin) is for the Ktor server application.
+ProLech busca centralizar esta información en una plataforma sólida, facilitando el seguimiento transaccional de la leche recolectada en campo hasta su llegada y recepción en la planta, garantizando a la administración datos exactos para la toma de decisiones.
 
-### Running the apps
+## Público objetivo
 
-Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:
+La aplicación está dirigida a empresas o centros de acopio de leche que trabajan de forma directa con los productores. Los principales usuarios serán:
 
-- Android app: `./gradlew :app:androidApp:assembleDebug`
-- Desktop app:
-  - Hot reload: `./gradlew :app:desktopApp:hotRun --auto`
-  - Standard run: `./gradlew :app:desktopApp:run`
-- Server: `./gradlew :server:run`
-- Web app:
-  - Wasm target (faster, modern browsers): `./gradlew :app:webApp:wasmJsBrowserDevelopmentRun`
-  - JS target (slower, supports older browsers): `./gradlew :app:webApp:jsBrowserDevelopmentRun`
-- iOS app: open the [/app/iosApp](./app/iosApp) directory in Xcode and run it from there.
+* Personal encargado de la recolección en ruta.
+* Personal encargado de la recepción en planta.
+* Administradores y gerencia del centro de acopio.
+* Responsables del control de calidad.
 
-### Running tests
+La aplicación podrá utilizarse principalmente durante las actividades de recolección en campo (mediante dispositivos móviles) y la recepción de la leche en planta.
 
-Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
+## Funcionalidades previstas
 
-- Android tests: `./gradlew :app:shared:testAndroidHostTest`
-- Desktop tests: `./gradlew :app:shared:jvmTest`
-- Server tests: `./gradlew :server:test`
-- Web tests:
-  - Wasm target: `./gradlew :app:shared:wasmJsTest`
-  - JS target: `./gradlew :app:shared:jsTest`
-- iOS tests: `./gradlew :app:shared:iosSimulatorArm64Test`
+* *F1:* Gestionar y consultar el registro de productores asociados.
+* *F2:* Registrar y consultar las rutas de recolección.
+* *F3:* Registrar las cantidades de leche recolectadas por cada productor en campo.
+* *F4:* Registrar la recepción oficial de los lotes de leche en la planta.
+* *F5:* Comparar sistemáticamente la cantidad recolectada en ruta con la cantidad real recibida en planta.
+* *F6:* Registrar incidencias ocurridas durante el traslado o la recolección.
+* *F7:* Registrar los parámetros e información básica del control de calidad.
+* *F8:* Autenticación e inicio de sesión seguro para los usuarios.
+* *F9:* Permitir trabajar sin conexión a Internet en zonas de poca cobertura y sincronizar la información al recuperar la conexión.
+* *F10:* Consultar el historial detallado de entregas y recolecciones por productor.
+* *F11:* Mostrar información gerencial básica sobre los volúmenes recolectados y recibidos.
 
----
+## Entidad principal del CRUD
 
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html),
-[Compose Multiplatform](https://github.com/JetBrains/compose-multiplatform/#compose-multiplatform),
-[Kotlin/Wasm](https://kotl.in/wasm/)…
+*Productor*
+La entidad principal del CRUD será Productor, debido a que representa a las personas que entregan la leche al centro de acopio. Esta entidad es el núcleo relacional indispensable para las transacciones de entrega, rutas y pagos.
 
-We would appreciate your feedback on Compose/Web and Kotlin/Wasm in the public Slack channel [#compose-web](https://slack-chats.kotlinlang.org/c/compose-web).
-If you face any issues, please report them on [YouTrack](https://youtrack.jetbrains.com/newIssue?project=CMP).
+*Atributos tentativos:*
+* idProductor
+* nombres
+* apellidos
+* dni
+* telefono
+* direccion
+* comunidad
+* estado
+
+La entidad Productor estará relacionada posteriormente con las entregas y los registros de recolección realizados durante el flujo de trabajo.
+
+## Capacidad nativa prevista
+
+*Ubicación (Geolocalización)*
+La aplicación utilizará la ubicación del dispositivo para registrar o consultar las coordenadas exactas de los puntos de recolección y apoyar el seguimiento logístico de las rutas.
+
+Esta capacidad permitirá relacionar una recolección con su ubicación geográfica en tiempo real, facilitando el control de las actividades realizadas por el personal en campo.
+
+## Equipo ProLech
+
+| Integrante | Rol semana 1 |
+| :--- | :--- |
+| JAYSON SMIT COAQUIRA RAMIREZ | Coordinación |
+| YHON FREDY QUILLA LARICO | QA y documentación |
+| JHON SAUL MAMANI CRUZ | Lógica y datos |
+| ALEX BRAYAN GUTIERREZ HUANCA | UI |
+
+## Tecnologías
+
+* Kotlin Multiplatform
+* Compose Multiplatform
+* Kotlin
+* Android
+* Desktop
+* Git
+* GitHub
+
+La aplicación será desarrollada utilizando Kotlin Multiplatform y Compose Multiplatform, de acuerdo con las tecnologías establecidas para el alcance de este proyecto.
+
+## Targets
+
+* Android
+* Desktop
+
+> *Nota:* iOS preparado: requiere macOS para compilar.
