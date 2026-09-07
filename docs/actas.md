@@ -1,1 +1,18 @@
-﻿# Actas de Reunión del Equipo ProLech`n`n## Acta 1: Inicio y Definición del Alcance`n* **Fecha**: 15 de Agosto, 2026`n* **Acuerdos**: Definición de la arquitectura KMP, distribución de módulos entre Android y Desktop, y aprobación de requerimientos funcionales del acopio de leche.`n`n## Acta 2: Diseño de Arquitectura y Base de Datos`n* **Fecha**: 25 de Agosto, 2026`n* **Acuerdos**: Selección de Room Multiplatform para persistencia local offline-first y Ktor Client para sincronización REST.`n`n## Acta 3: Consolidación y Documentación`n* **Fecha**: 6 de Septiembre, 2026`n* **Acuerdos**: Aprobación final de la documentación en la rama develop y preparación del repositorio en GitHub.
+﻿# Actas de Reunión — Equipo ProLech
+
+## Acta 1 — Semana 1 — 15-08-2026
+
+*Asistentes a la sesión:*
+* Jayson Smit Coaquira Ramirez
+* Yhon Fredy Quilla Larico
+* Jhon Saul Mamani Cruz
+* Alex Brayan Gutierrez Huanca
+
+---
+
+### Acuerdos de la reunión
+
+#### 1. Definición del Proyecto
+Tras debatir varias opciones, el equipo acordó por unanimidad desarrollar *ProLech*, un sistema integral para el control y acopio de leche.
+
+Elegimos esta idea porque en nuestra zona (Juliaca y alrededores) el sector ganadero es muy fuerte, pero muchas plantas acopiadoras siguen llevando sus cuentas en cuadernos. Esto genera desconfianza en los pagos y pérdida de datos. ProLech digitalizará este trato diario. Cumple perfectamente con los requisitos del curso.
