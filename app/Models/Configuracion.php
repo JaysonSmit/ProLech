@@ -29,13 +29,31 @@ class Configuracion extends Model
         };
     }
 
-    /** Guarda o actualiza el valor de una clave */
+    /**
+     * Guarda o actualiza el valor de una clave. Una clave nueva toma el tipo del valor:
+     * antes la columna "tipo" quedaba en "decimal" y un texto como el nombre de la planta
+     * se leía como 0 (y un RUC como número con decimales).
+     */
     public static function set(string $clave, mixed $valor): void
     {
-        static::updateOrCreate(
-            ['clave' => $clave],
-            ['valor' => (string) $valor]
-        );
+        $fila = static::firstOrNew(['clave' => $clave]);
+        $fila->valor = is_bool($valor) ? ($valor ? '1' : '0') : (string) $valor;
+        if (! $fila->exists) {
+            $fila->tipo = self::tipoDe($valor);
+        }
+        $fila->save();
+    }
+
+    public static function tipoDe(mixed $valor): string
+    {
+        return match (true) {
+            is_bool($valor)  => 'booleano',
+            is_int($valor)   => 'entero',
+            is_float($valor) => 'decimal',
+            // Números escritos como texto ("1500", "-15.633") sí son números; un RUC o un celular no
+            is_string($valor) && preg_match('/^-?\d{1,7}(\.\d+)?$/', $valor) === 1 => 'decimal',
+            default          => 'texto',
+        };
     }
 
     /** Devuelve el precio por litro según la temporada activa */
