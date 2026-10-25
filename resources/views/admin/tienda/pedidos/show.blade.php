@@ -13,6 +13,27 @@
 
     {{-- Detalles del pedido --}}
     <div class="card">
+        @php
+            $sunat = match ($pedido->sunat_estado) {
+                'aceptada'  => ['✅ Aceptada por SUNAT', '#dcfce7', '#166534'],
+                'enviada'   => ['📨 Enviada a SUNAT', '#dbeafe', '#1d4ed8'],
+                'rechazada' => ['❌ Rechazada', '#fee2e2', '#991b1b'],
+                'error'     => ['⚠️ Error de conexión', '#fef3c7', '#92400e'],
+                'simulada'  => ['🧪 Interna (Nubefact sin configurar)', '#f1f5f9', '#475569'],
+                default     => ['⏳ Sin enviar', '#f1f5f9', '#475569'],
+            };
+        @endphp
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 22px; background:{{ $sunat[1] }}; color:{{ $sunat[2] }}; font-size:.82rem; font-weight:600">
+            <span>Boleta electrónica: {{ $sunat[0] }} @if($pedido->sunat_mensaje)· <span style="font-weight:400">{{ \Illuminate\Support\Str::limit($pedido->sunat_mensaje, 120) }}</span>@endif</span>
+            <span style="display:flex; gap:8px">
+                @if($pedido->sunat_pdf_url)<a href="{{ $pedido->sunat_pdf_url }}" target="_blank" rel="noopener">PDF SUNAT</a>@endif
+                @if(in_array($pedido->sunat_estado, [null, 'rechazada', 'error', 'simulada'], true))
+                <form method="POST" action="{{ route('admin.tienda.pedidos.sunat', $pedido) }}" style="margin:0">@csrf
+                    <button class="btn btn-ghost btn-sm" type="submit">↻ Enviar a SUNAT</button>
+                </form>
+                @endif
+            </span>
+        </div>
         <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <h3 class="card-title" style="font-size:1.1rem; font-family:monospace;">
@@ -26,6 +47,9 @@
                 <a href="{{ URL::signedRoute('tienda.boleta', ['codigo' => $pedido->codigo_pedido]) }}"
                    target="_blank" rel="noopener" class="btn btn-ghost btn-sm">
                     🧾 Boleta {{ $pedido->numero_comprobante }}
+                </a>
+                <a href="{{ $pedido->whatsapp_url }}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="color:#15803d">
+                    💬 WhatsApp
                 </a>
                 <span class="badge" style="background:{{ $badge['bg'] }}; color:{{ $badge['color'] }}; font-size:.82rem;">
                     {{ $badge['label'] }}

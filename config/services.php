@@ -44,4 +44,13 @@ return [
         'token'       => env('ULTRAMSG_TOKEN'),
     ],
 
+    /*
+    | Nubefact — boleta electrónica ante SUNAT. Sin estos valores la boleta
+    | queda como representación interna ("simulada").
+    */
+    'nubefact' => [
+        'url'   => env('NUBEFACT_URL'),
+        'token' => env('NUBEFACT_TOKEN'),
+    ],
+
 ];

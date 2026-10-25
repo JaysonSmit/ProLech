@@ -86,7 +86,7 @@
 
         <div class="cta-row">
             <a href="{{ $urlBoleta }}" class="btn-primary" target="_blank" rel="noopener">🧾 Ver / descargar boleta</a>
-            <a href="{{ route('tienda.index') }}#catalogo" class="btn-ghost">🛒 Seguir comprando</a>
+            <a href="{{ route('tienda.seguimiento', ['codigo' => $pedido->codigo_pedido]) }}" class="btn-ghost">📦 Seguir mi pedido</a>
         </div>
 
         <div class="box">

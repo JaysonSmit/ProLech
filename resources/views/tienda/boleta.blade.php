@@ -212,7 +212,10 @@
 
         <footer class="foot">
             <p>
-                Representación impresa de la boleta de venta electrónica generada por el sistema ProLech.<br>
+                Representación impresa de la boleta de venta electrónica generada por el sistema ProLech.
+                @if($pedido->sunat_estado === 'aceptada') <b>Aceptada por SUNAT.</b>
+                @elseif($pedido->sunat_estado !== 'enviada') <b>Comprobante interno: aún no enviado a SUNAT.</b>@endif
+                @if($pedido->sunat_pdf_url) <a href="{{ $pedido->sunat_pdf_url }}">Ver PDF oficial</a>@endif<br>
                 Consérvala para cualquier reclamo o cambio. Código de pedido: <b>{{ $pedido->codigo_pedido }}</b>.
             </p>
             <div class="qr" id="qr" aria-hidden="true"></div>

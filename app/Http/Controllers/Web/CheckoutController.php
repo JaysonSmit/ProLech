@@ -125,7 +125,17 @@ class CheckoutController extends Controller
                 ->withErrors(['checkout' => 'Ocurrió un error al procesar tu pedido. Intenta de nuevo.']);
         }
 
-        // ── 5. Redirigir a la confirmación (el JS vaciará el localStorage) ────
+        // ── 5. Boleta electrónica (Nubefact) y aviso por WhatsApp, después de responder ──
+        // defer(): una sola vez por petición (afterResponse() se acumula en procesos largos)
+        $pedidoId = $pedido->id;
+        \Illuminate\Support\defer(function () use ($pedidoId) {
+            $p = \App\Models\PedidoWeb::find($pedidoId);
+            if (! $p) return;
+            app(\App\Services\FacturacionElectronicaService::class)->emitirBoleta($p);
+            \App\Services\WhatsAppService::enviar($p->cliente_telefono, $p->mensajeEstado());
+        });
+
+        // ── 6. Redirigir a la confirmación (el JS vaciará el localStorage) ────
         return redirect()
             ->route('tienda.confirmacion', ['codigo' => $pedido->codigo_pedido])
             ->with('pedido_id', $pedido->id);
@@ -155,6 +165,39 @@ class CheckoutController extends Controller
         $urlBoleta = URL::signedRoute('tienda.boleta', ['codigo' => $pedido->codigo_pedido]);
 
         return view('tienda.confirmacion', compact('pedido', 'codigo', 'urlBoleta'));
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // SEGUIMIENTO
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * GET /tienda/seguimiento?codigo=WEB-1001&telefono=777
+     * Pide los últimos 3 dígitos del celular para que nadie vea pedidos ajenos.
+     */
+    public function seguimiento(Request $request): View
+    {
+        $codigo   = strtoupper(trim((string) $request->query('codigo', '')));
+        $telefono = preg_replace('/\D/', '', (string) $request->query('telefono', ''));
+        $pedido   = null;
+        $error    = null;
+
+        if ($codigo !== '' && $telefono !== '') {
+            $candidato = \App\Models\PedidoWeb::with('detalles.producto')->where('codigo_pedido', $codigo)->first();
+            $digitos   = preg_replace('/\D/', '', (string) $candidato?->cliente_telefono);
+            if ($candidato && strlen($telefono) >= 3 && str_ends_with($digitos, $telefono)) {
+                $pedido = $candidato;
+            } else {
+                $error = 'No encontramos un pedido con ese código y celular.';
+            }
+        }
+
+        return view('tienda.seguimiento', [
+            'pedido'    => $pedido,
+            'codigo'    => $codigo,
+            'error'     => $error,
+            'urlBoleta' => $pedido ? URL::signedRoute('tienda.boleta', ['codigo' => $pedido->codigo_pedido]) : null,
+        ]);
     }
 
     // ──────────────────────────────────────────────────────────────────────────

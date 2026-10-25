@@ -378,6 +378,7 @@
             Catálogo
         </a>
         <a href="{{ route('tienda.index') }}#proceso">Del campo a tu mesa</a>
+        <a href="{{ route('tienda.seguimiento') }}" class="{{ request()->routeIs('tienda.seguimiento') ? 'active' : '' }}">Seguir mi pedido</a>
         <button class="cart-btn" onclick="ProLechCart.toggleDrawer()" aria-label="Carrito">
             🛒
             <span class="cart-label">Carrito</span>
@@ -435,6 +436,7 @@
             <ul class="footer-list">
                 <li><a href="{{ route('tienda.index') }}#catalogo">Catálogo</a></li>
                 <li><a href="{{ route('tienda.index') }}#proceso">Del campo a tu mesa</a></li>
+                <li><a href="{{ route('tienda.seguimiento') }}">Seguir mi pedido</a></li>
                 <li><a href="#" onclick="ProLechCart.openDrawer(); return false;">Mi carrito</a></li>
             </ul>
         </div>

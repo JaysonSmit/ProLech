@@ -25,6 +25,9 @@ class PedidoWeb extends Model
         'estado_pedido',
         'comprobante_yape_url',
         'notas',
+        'sunat_estado',
+        'sunat_pdf_url',
+        'sunat_mensaje',
     ];
 
     protected $casts = [
@@ -150,6 +153,36 @@ class PedidoWeb extends Model
             'igv'     => round($total - $gravada, 2),
             'total'   => $total,
         ];
+    }
+
+    /** Enlace "click to chat" para escribirle al cliente desde el panel. */
+    public function getWhatsappUrlAttribute(): string
+    {
+        $numero = preg_replace('/\D/', '', (string) $this->cliente_telefono);
+        if (strlen($numero) === 9) $numero = '51' . $numero;
+        return 'https://wa.me/' . $numero . '?text=' . rawurlencode($this->mensajeEstado());
+    }
+
+    /** Texto para avisar al cliente del estado actual de su pedido. */
+    public function mensajeEstado(): string
+    {
+        $nombre = explode(' ', trim($this->cliente_nombre))[0];
+        $seguimiento = route('tienda.seguimiento', ['codigo' => $this->codigo_pedido]);
+        return match ($this->estado_pedido) {
+            'Pagado'    => "Hola {$nombre} 👋 Confirmamos el pago de tu pedido {$this->codigo_pedido} (S/ " . number_format((float) $this->total, 2) . "). Lo estamos preparando 🧀",
+            'Enviado'   => "Hola {$nombre} 🚚 Tu pedido {$this->codigo_pedido} ya va en camino. ¡Gracias por elegir ProLech!",
+            'Cancelado' => "Hola {$nombre}. Tu pedido {$this->codigo_pedido} fue cancelado. Si tienes dudas, responde este mensaje.",
+            default     => "Hola {$nombre} 🥛 Recibimos tu pedido {$this->codigo_pedido} por S/ " . number_format((float) $this->total, 2) . ". Síguelo aquí: {$seguimiento}",
+        };
+    }
+
+    /** Devuelve el stock al cancelar (o lo vuelve a descontar si se reactiva). */
+    public function moverStock(int $signo): void
+    {
+        foreach ($this->detalles as $d) {
+            ProductoTienda::where('id', $d->producto_tienda_id)
+                ->{$signo > 0 ? 'increment' : 'decrement'}('stock_disponible', $d->cantidad);
+        }
     }
 
     /**

@@ -283,6 +283,11 @@ Route::prefix('tienda')->name('tienda.')->group(function () {
     // Confirmación de pedido
     Route::get('/confirmacion/{codigo}', [CheckoutController::class, 'confirmacion'])->name('confirmacion');
 
+    // Seguimiento público del pedido (código + celular para proteger los datos)
+    Route::get('/seguimiento', [CheckoutController::class, 'seguimiento'])
+         ->middleware('throttle:20,1')
+         ->name('seguimiento');
+
     // Boleta de venta (enlace firmado)
     Route::get('/boleta/{codigo}', [CheckoutController::class, 'boleta'])
          ->middleware('signed')
@@ -310,4 +315,5 @@ Route::middleware(['auth', 'rol:admin', '2fa'])
     Route::get('pedidos',                           [AdminTiendaController::class, 'pedidosIndex'])->name('pedidos.index');
     Route::get('pedidos/{pedido}',                  [AdminTiendaController::class, 'pedidosShow'])->name('pedidos.show');
     Route::post('pedidos/{pedido}/estado',          [AdminTiendaController::class, 'pedidosEstado'])->name('pedidos.estado');
+    Route::post('pedidos/{pedido}/sunat',           [AdminTiendaController::class, 'pedidosSunat'])->name('pedidos.sunat');
 });

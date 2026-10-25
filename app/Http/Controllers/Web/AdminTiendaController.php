@@ -189,11 +189,43 @@ class AdminTiendaController extends Controller
             'estado_pedido' => ['required', Rule::in(['Pendiente', 'Pagado', 'Enviado', 'Cancelado'])],
         ]);
 
-        $pedido->update(['estado_pedido' => $request->estado_pedido]);
+        $anterior = $pedido->estado_pedido;
+        $nuevo    = $request->estado_pedido;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($pedido, $anterior, $nuevo) {
+            $pedido->load('detalles');
+            // Antes al cancelar el stock NO se devolvía: los productos quedaban "vendidos"
+            if ($nuevo === 'Cancelado' && $anterior !== 'Cancelado') {
+                $pedido->moverStock(+1);
+            } elseif ($anterior === 'Cancelado' && $nuevo !== 'Cancelado') {
+                foreach ($pedido->detalles as $d) {
+                    $stock = \App\Models\ProductoTienda::whereKey($d->producto_tienda_id)->lockForUpdate()->value('stock_disponible');
+                    if ($stock < $d->cantidad) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'estado_pedido' => 'No hay stock suficiente para reactivar este pedido.',
+                        ]);
+                    }
+                }
+                $pedido->moverStock(-1);
+            }
+            $pedido->update(['estado_pedido' => $nuevo]);
+        });
+
+        // Aviso automático al cliente (Ultramsg; sin credenciales solo se registra en el log)
+        if ($anterior !== $nuevo) {
+            \App\Services\WhatsAppService::enviar($pedido->cliente_telefono, $pedido->fresh()->mensajeEstado());
+        }
 
         return back()->with(
             'success',
-            "✅ Pedido {$pedido->codigo_pedido} marcado como {$request->estado_pedido}."
+            "✅ Pedido {$pedido->codigo_pedido} marcado como {$nuevo}. Se avisó al cliente por WhatsApp."
         );
+    }
+
+    /** POST /admin/tienda/pedidos/{pedido}/sunat — reintenta el envío de la boleta. */
+    public function pedidosSunat(PedidoWeb $pedido, \App\Services\FacturacionElectronicaService $sunat): RedirectResponse
+    {
+        $sunat->emitirBoleta($pedido);
+        return back()->with('success', "Boleta {$pedido->numero_comprobante}: " . ($pedido->sunat_mensaje ?? $pedido->sunat_estado));
     }
 }
