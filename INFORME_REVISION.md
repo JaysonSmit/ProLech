@@ -9,8 +9,10 @@ Fecha: 25/10/2026 · Alcance: app móvil KMP (`composeApp` + `composeAndroidApp`
 
 | Suite | Dónde corre | Resultado |
 |---|---|---|
-| Backend Laravel (`php artisan test`) | SQLite en memoria | **50 / 50** ✅ |
-| App: `commonTest` en Android (`:composeApp:testAndroidHostTest`) | JVM del host Android | **45 / 45** ✅ |
+| Backend Laravel (`php artisan test`) | SQLite en memoria | **82 / 82** ✅ (eran 50) |
+| App: `commonTest` en Android (`:composeApp:testAndroidHostTest`) | JVM del host Android | **58 / 58** ✅ (eran 45) |
+| **E2E completo contra el servidor real con los datos del seeder** | Laravel `:8001` + MySQL | **70 / 70 peticiones** ✅ |
+| **APK release (R8 + firma) en emulador Android 14** | Pixel x86_64, Google APIs | ✅ login, ruta, mapa, acopio sin señal y sincronización |
 | App: `commonTest` + grafo de Koin en JVM | proyecto de verificación | **47 / 47** ✅ |
 | **E2E app ↔ web** (código Kotlin real contra Laravel real) | `http://127.0.0.1:8000` + MySQL | **12 / 12 pasos** ✅ |
 | Compilación APK nuevo `:composeAndroidApp` | AGP 9.3.3 / SDK 36 | ✅ 17,7 MB |
@@ -148,22 +150,65 @@ En el login, toca **"▸ Servidor"** y escribe la IP de la PC (hoy `192.168.0.10
 | 18 | APK release | Firmado (`firma/prolech-release.jks`, fuera de git) con **R8** (minify + shrinkResources) | ✅ |
 
 ### 6.1 Prueba en emulador
-EMULADOR_RESULTADOS
+Emulador Android 14 (API 34, Google APIs) con el **APK release firmado y con R8** (`pe.prolech.acopio` 2.1),
+contra el Laravel de la PC (`http://10.0.2.2:8001`) y los datos del seeder. Capturas en `docs/capturas/`.
+
+| Paso | Resultado |
+|---|---|
+| Arranque y login (chofer Carlos) | ✅ sin cierres; el HTTP solo funciona hacia el emulador (release = solo HTTPS) |
+| Mi ruta | ✅ Collana 1, 3/5 atendidos, 23.6 km por recorrer, camión 106/1500 L, mapa OpenStreetMap con el camino por carretera |
+| Acopio en **modo avión** | ✅ "Acopio guardado sin conexión", 1 por subir, 154 L |
+| Volver la señal | ✅ se subió solo; en el servidor quedó con el UUID del celular, 48.5 L, grasa 3.7 % |
+| Token revocado (sesión iniciada en otro equipo) | ✅ vuelve al login con aviso, sin perder datos |
+
+**E2E del servidor (70 peticiones, 0 fallas)**: API del chofer (login, 422 con clave mala, `me`, `mi-ruta`, crear/editar/borrar
+acopio, 422 con litros negativos, foto multipart, GPS en lote e individual, historial, notificaciones, reuniones, logout y 401
+después), tienda (catálogo con sus 7 imágenes, checkout real → boleta B001, seguimiento con y sin el celular correcto),
+35 páginas del panel con sesión de administrador (+ `/proveedor/*` correctamente prohibido), panel en vivo y las
+descargas Excel/PDF/CSV. El límite de intentos del login también se comprobó en vivo (429 al 6.º intento).
+Los datos de prueba se borraron al terminar (el stock se devolvió).
 
 ### 6.2 Bugs encontrados en esta ronda
+- **El mapa no se veía en la app** ("Access blocked 403"): osmdroid identifica la app con el nombre del paquete y
+  OpenStreetMap bloquea los `com.example.*`. Nuevo `applicationId` **`pe.prolech.acopio`** (Google Play tampoco acepta `com.example`).
+- **La ruta no se descargaba**: `Configuracion::set()` guardaba toda clave nueva como número, y el nombre de la planta llegaba como `0`.
+  Ahora el tipo se deduce del valor + migración que corrige las claves existentes (RUC, Yape, teléfonos…).
+- **Un token vencido solo se detectaba al sincronizar**: en "Mi ruta" se veía "Unauthenticated." sin salida. Ahora cualquier 401 lleva al login.
+- **Regla de 2 strikes contaba la semana equivocada** de domingo a miércoles (restaba una semana de más).
+- **`migrate:fresh --seed` fallaba en SQLite** (CHECK del rol y del método de pago).
+- **Dependencias con vulnerabilidades** (league/commonmark, symfony/http-foundation) → actualizadas; `composer audit` limpio.
 - **Las contraseñas demo se publicaban** en el HTML del login (cualquiera podía verlas con "ver código fuente") → solo en `local`.
 - **Cancelar un pedido no devolvía el stock**, y reactivarlo no lo verificaba → se corrigieron las dos cosas.
 - El "**total de litros**" sumaba todo el historial y no solo lo de hoy.
 - Un registro que el servidor rechaza (422) se **reintentaba para siempre** y bloqueaba la cola.
 - Tras cerrar sesión, el login **volvía a entrar solo** (se reutilizaba el ViewModel anterior).
 
-### 6.3 Llaves y respaldo
+### 6.3 Datos de demostración (`ProlechDemoSeeder`)
+`php artisan db:seed --class=ProlechDemoSeeder` (idempotente, no borra nada; también lo llama `DatabaseSeeder`):
+planta en Huata (-15.633, -70.038), **4 zonas con polígono**, **5 choferes** (Carlos, Miguel, Julio, Wilber = titulares de
+Collana 1–4; Fredy = volante; clave `prolech2024`), **20 ganaderos** con GPS dentro de su zona, **14 días de acopios** (aprobados,
+observados, rechazados) con **Valentín Coaquira suspendido** por 2 strikes, ruta de hoy con trazo GPS en Collana 1 y 2,
+liquidaciones de la semana pasada pagadas, stock amplio de insumos, **7 lotes de producción**, **7 productos** con imagen
+propia (SVG, nunca rota) y **pedidos** Pendiente/Pagado/Enviado.
+
+### 6.4 Exportar y desplegar
+- Excel **.xlsx** real (encabezado fijo, números sumables), **PDF** (acopios con totales, planilla de liquidaciones con firmas,
+  hoja de ruta por zona con casillas) y CSV.
+- Despliegue: **Docker + Caddy** (HTTPS automático) o **Nginx + certbot** con `deploy/instalar-vps.sh`.
+- CI: `.github/workflows/ci.yml` en ambos repositorios.
+
+### 6.5 Llaves y respaldo
 `keystore.properties` y `firma/prolech-release.jks` **no están en git**. Guarda una copia en un lugar
 seguro (USB o nube privada). Si se pierden, no se pueden publicar actualizaciones con la misma firma.
 
 ---
 
 ## 7. Límites conocidos
+
+- **En esta PC el puerto 8000 lo ocupa el Apache de Laragon** (otro sitio). Para probar con el celular usa
+  `php artisan serve --host=0.0.0.0 --port=8001` y en la app `http://IP-DE-LA-PC:8001`.
+- **El disco C: está lleno** (el archivo de paginación creció a 19.7 GB). Reiniciar la PC lo reduce; el emulador quedó en `D:\AndroidEmu`.
+- Como cambió el `applicationId`, la versión 2.1 se instala **como app nueva**: desinstala la anterior ("ProLech Acopio" 2.0).
 
 - **iOS** no se puede compilar en Windows (requiere Mac). Agregar a `Info.plist`: `NSLocationWhenInUseUsageDescription`, `NSCameraUsageDescription`. En iOS el OCR, el ticket y la impresora Bluetooth están como "no disponible".
 - El servidor público de **OSRM** es para uso moderado; en producción conviene uno propio.
