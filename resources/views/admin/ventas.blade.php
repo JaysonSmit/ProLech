@@ -164,30 +164,6 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="precio_display">Precio unitario fijado</label>
-                    <input type="text" id="precio_display"
-                           readonly
-                           value="{{ old('tipo_cliente') ? number_format($precios[old('tipo_cliente')], 2) : '' }}"
-                           style="background:#f8fafc;cursor:not-allowed;color:var(--green);font-weight:700;font-size:1rem"
-                           placeholder="Automático según tipo">
-                    <span style="font-size:.72rem;color:var(--text-muted)">
-                        Mayorista S/{{ number_format($precios['mayorista'],2) }} | Público S/{{ number_format($precios['publico'],2) }}
-                    </span>
-                </div>
-
-                <div class="form-group">
-                    <label for="cantidad_kg">Cantidad (kg / moldes) *</label>
-                    <input type="number" id="cantidad_kg" name="cantidad_kg"
-                           step="0.001" min="0.001" required
-                           value="{{ old('cantidad_kg') }}"
-                           class="{{ $errors->has('cantidad_kg') ? 'invalid' : '' }}"
-                           placeholder="Ej: 50.000">
-                    @error('cantidad_kg')
-                        <span class="error-msg">{{ $message }}</span>
-                    @enderror
-                </div>
-
-                <div class="form-group">
                     <label for="fecha_venta">Fecha de venta *</label>
                     <input type="date" id="fecha_venta" name="fecha_venta"
                            required
@@ -211,21 +187,59 @@
                     @enderror
                 </div>
 
-                {{-- Total en tiempo real --}}
-                <div class="form-group" style="justify-content:flex-end;align-items:flex-start">
-                    <div id="preview-total"
-                         style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 16px;min-width:180px">
-                        <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">
-                            Total a cobrar
+                {{-- ── Carrito: varios productos en la misma venta ── --}}
+                <style>
+                    #tabla-carrito select, #tabla-carrito input { min-width: 0; }
+                    /* Celular: cada línea del carrito es una tarjeta (producto arriba, cantidad/precio/subtotal abajo) */
+                    @media (max-width: 700px) {
+                        #tabla-carrito thead { display: none; }
+                        #tabla-carrito tr { display: grid; grid-template-columns: 1fr 1fr 40px; gap: 6px; padding: 8px 4px; }
+                        #tabla-carrito td { padding: 2px 6px !important; }
+                        #tabla-carrito td:first-child { grid-column: 1 / -1; }
+                        #tabla-carrito td[data-precio] { text-align: left !important; align-self: center; }
+                        #tabla-carrito td[data-subtotal] { grid-column: 1 / 3; text-align: left !important; }
+                        #tabla-carrito td:last-child { grid-column: 3; grid-row: 2; }
+                    }
+                </style>
+                <div class="form-group" style="grid-column: 1 / -1">
+                    <label>Productos de la venta *</label>
+                    <div style="border:1.5px solid var(--border);border-radius:12px;overflow:hidden">
+                        <table style="width:100%;border-collapse:collapse" id="tabla-carrito">
+                            <thead>
+                                <tr style="background:#f8fafc">
+                                    <th style="text-align:left;padding:8px 12px;font-size:.72rem">Producto</th>
+                                    <th style="padding:8px;font-size:.72rem;width:140px">Cantidad</th>
+                                    <th style="padding:8px;font-size:.72rem;width:120px;text-align:right">Precio</th>
+                                    <th style="padding:8px;font-size:.72rem;width:120px;text-align:right">Subtotal</th>
+                                    <th style="width:44px"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="carrito"></tbody>
+                        </table>
+                        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+                                    padding:12px;border-top:1px solid var(--border);background:#fbfdff">
+                            <button type="button" class="btn btn-sm" onclick="agregarLineaVenta()"
+                                    style="background:#eff6ff;color:#1d4ed8;border:1.5px dashed #93c5fd;font-weight:700">
+                                ➕ Agregar producto
+                            </button>
+                            <div style="text-align:right">
+                                <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px">Total a cobrar</div>
+                                <div id="preview-total-valor" style="font-size:1.6rem;font-weight:800;color:var(--green)">S/ 0.00</div>
+                                <div id="preview-precio-unit" style="font-size:.75rem;color:var(--text-muted)">Elige el tipo de cliente para ver los precios</div>
+                            </div>
                         </div>
-                        <div id="preview-total-valor"
-                             style="font-size:1.6rem;font-weight:700;color:var(--green);margin-top:2px">
-                            S/ 0.00
-                        </div>
-                        <div id="preview-precio-unit"
-                             style="font-size:.75rem;color:var(--text-muted);margin-top:2px">
-                            Precio: — / kg
-                        </div>
+                    </div>
+                    @if($errors->has('lineas') || $errors->has('lineas.*'))
+                        <span class="error-msg">{{ $errors->first('lineas') ?: collect($errors->get('lineas.*'))->flatten()->first() }}</span>
+                    @endif
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                        @foreach($catalogo as $item)
+                            <button type="button" class="btn btn-sm" onclick="agregarLineaVenta('{{ $item['clave'] }}')"
+                                    style="font-size:.72rem;padding:3px 10px;background:var(--bg);border:1px solid var(--border);color:var(--text)"
+                                    {{ $item['stock'] <= 0 ? 'disabled' : '' }}>
+                                + {{ $item['nombre'] }} <span style="color:var(--text-muted)">({{ $item['decimales'] ? number_format($item['stock'], 1) . ' kg' : $item['stock'] }})</span>
+                            </button>
+                        @endforeach
                     </div>
                 </div>
 
@@ -245,7 +259,7 @@
 
             <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
                 <button type="submit" class="btn btn-success" id="btnGuardar" disabled>
-                    💾 Registrar Venta y Programar Despacho
+                    💾 Registrar venta y programar despacho
                 </button>
                 <button type="reset" class="btn btn-sm"
                         style="background:var(--border);color:var(--text)"
@@ -306,8 +320,7 @@
                         <th>Destino</th>
                         <th>Despacho</th>
                         <th>Guía Remisión</th>
-                        <th>Kg</th>
-                        <th>Precio/kg</th>
+                        <th>Productos</th>
                         <th>Total</th>
                         <th>Acción</th>
                     </tr>
@@ -355,8 +368,16 @@
                                 </div>
                             @endif
                         </td>
-                        <td style="font-weight:600">{{ number_format($venta->cantidad_kg, 2) }} kg</td>
-                        <td style="font-size:.82rem">S/ {{ number_format($venta->precio_unitario, 2) }}</td>
+                        <td style="font-size:.8rem;min-width:180px">
+                            @forelse($venta->detalles as $d)
+                                <div>{{ rtrim(rtrim(number_format($d->cantidad, 3), '0'), '.') }} {{ $d->unidad }} · {{ $d->descripcion }}
+                                    <span style="color:var(--text-muted)">× S/ {{ number_format($d->precio_unitario, 2) }}</span></div>
+                            @empty
+                                {{-- Ventas anteriores al carrito: solo queso de planta --}}
+                                <div>{{ number_format($venta->cantidad_kg, 2) }} kg · Queso de planta
+                                    <span style="color:var(--text-muted)">× S/ {{ number_format($venta->precio_unitario, 2) }}</span></div>
+                            @endforelse
+                        </td>
                         <td><strong style="color:var(--green)">S/ {{ number_format($venta->total, 2) }}</strong></td>
                         <td>
                             <button type="button" class="btn btn-sm btn-despacho"
@@ -436,60 +457,97 @@
 (function () {
     'use strict';
 
-    var PRECIOS = {
-        mayorista: {{ $precios['mayorista'] }},
-        publico:   {{ $precios['publico'] }}
+    var CATALOGO = @json($catalogo);
+    var PREVIAS  = @json(collect(old('lineas', []))->values());
+    var porClave = {};
+    CATALOGO.forEach(function (p) { porClave[p.clave] = p; });
+
+    var selectTipo   = document.getElementById('tipo_cliente');
+    var inputDestino = document.getElementById('destino');
+    var inputCliente = document.getElementById('cliente');
+    var carrito      = document.getElementById('carrito');
+    var previewValor = document.getElementById('preview-total-valor');
+    var previewUnit  = document.getElementById('preview-precio-unit');
+    var btnGuardar   = document.getElementById('btnGuardar');
+    var siguiente    = 0;
+
+    function sol(v) { return 'S/ ' + Number(v).toFixed(2); }
+    function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+    function opciones(sel) {
+        return '<option value="">— Producto —</option>' + CATALOGO.map(function (p) {
+            var stock = p.decimales ? Number(p.stock).toFixed(1) + ' kg' : p.stock + ' und';
+            return '<option value="' + p.clave + '"' + (String(sel) === p.clave ? ' selected' : '') +
+                (p.stock <= 0 ? ' disabled' : '') + '>' + esc(p.nombre) + ' — stock ' + stock + '</option>';
+        }).join('');
+    }
+
+    window.agregarLineaVenta = function (clave, cantidad) {
+        if (clave) {
+            var ya = carrito.querySelector('select option[value="' + clave + '"]:checked');
+            if (ya) { ya.closest('tr').querySelector('input').focus(); return; }
+        }
+        var i = siguiente++;
+        var tr = document.createElement('tr');
+        tr.style.borderTop = '1px solid var(--border)';
+        tr.innerHTML =
+            '<td style="padding:8px 12px"><select name="lineas[' + i + '][producto]" required style="width:100%">' + opciones(clave || '') + '</select></td>' +
+            '<td style="padding:8px"><input type="number" name="lineas[' + i + '][cantidad]" min="0.001" step="any" required ' +
+            'value="' + (cantidad || '') + '" placeholder="0" style="width:100%"><div data-aviso style="font-size:.7rem;color:#dc2626"></div></td>' +
+            '<td data-precio style="padding:8px;text-align:right;font-size:.85rem;color:var(--text-muted)">—</td>' +
+            '<td data-subtotal style="padding:8px;text-align:right;font-weight:700">—</td>' +
+            '<td style="padding:8px"><button type="button" title="Quitar" style="border:none;background:#fef2f2;color:#dc2626;' +
+            'border-radius:8px;width:32px;height:32px;cursor:pointer">✕</button></td>';
+        tr.querySelector('select').addEventListener('change', recalcular);
+        tr.querySelector('input').addEventListener('input', recalcular);
+        tr.querySelector('button').addEventListener('click', function () { tr.remove(); recalcular(); });
+        carrito.appendChild(tr);
+        recalcular();
+        (clave ? tr.querySelector('input') : tr.querySelector('select')).focus();
     };
 
-    var selectTipo     = document.getElementById('tipo_cliente');
-    var inputKg        = document.getElementById('cantidad_kg');
-    var inputDestino   = document.getElementById('destino');
-    var inputCliente   = document.getElementById('cliente');
-    var displayPrecio  = document.getElementById('precio_display');
-    var previewValor   = document.getElementById('preview-total-valor');
-    var previewUnit    = document.getElementById('preview-precio-unit');
-    var btnGuardar     = document.getElementById('btnGuardar');
-
-    function getPrecio() {
-        return PRECIOS[selectTipo.value] || 0;
-    }
-
     function recalcular() {
-        var precio = getPrecio();
-        var kg     = parseFloat(inputKg.value) || 0;
-        var total  = precio * kg;
-
-        if (precio > 0) {
-            displayPrecio.value = precio.toFixed(2);
-            previewUnit.textContent = 'Precio: S/ ' + precio.toFixed(2) + ' / kg';
-        } else {
-            displayPrecio.value = '';
-            previewUnit.textContent = 'Precio: — / kg';
-        }
-
-        previewValor.textContent = 'S/ ' + total.toFixed(2);
-
-        var clienteOk = inputCliente.value.trim().length > 0;
-        var destinoOk = inputDestino.value.trim().length > 0;
-        btnGuardar.disabled = !(precio > 0 && kg > 0 && clienteOk && destinoOk);
+        var tipo = selectTipo.value;
+        var total = 0, lineasOk = true, filas = carrito.querySelectorAll('tr');
+        Array.prototype.forEach.call(filas, function (tr) {
+            var p = porClave[tr.querySelector('select').value];
+            var input = tr.querySelector('input');
+            var cant = parseFloat(input.value) || 0;
+            var aviso = '';
+            if (p) {
+                input.step = p.decimales ? '0.001' : '1';
+                input.max = p.stock;
+                if (cant > p.stock) aviso = 'Solo hay ' + (p.decimales ? Number(p.stock).toFixed(1) : p.stock);
+                if (!p.decimales && cant % 1 !== 0) aviso = 'Solo unidades enteras';
+            }
+            var precio = p && tipo ? p[tipo] : 0;
+            tr.querySelector('[data-precio]').textContent = precio ? sol(precio) + ' / ' + p.unidad : '—';
+            tr.querySelector('[data-subtotal]').textContent = precio && cant ? sol(precio * cant) : '—';
+            tr.querySelector('[data-aviso]').textContent = aviso;
+            if (!p || cant <= 0 || aviso) lineasOk = false;
+            total += precio * cant;
+        });
+        previewValor.textContent = sol(total);
+        previewUnit.textContent = !tipo ? 'Elige el tipo de cliente para ver los precios'
+            : filas.length + (filas.length === 1 ? ' producto · tarifa ' : ' productos · tarifa ') + (tipo === 'mayorista' ? 'mayorista' : 'público');
+        var clienteOk = inputCliente.value.trim().length > 0, destinoOk = inputDestino.value.trim().length > 0;
+        btnGuardar.disabled = !(tipo && filas.length > 0 && lineasOk && clienteOk && destinoOk);
     }
 
-    function resetFormVenta() {
-        displayPrecio.value = '';
-        previewValor.textContent = 'S/ 0.00';
-        previewUnit.textContent = 'Precio: — / kg';
-        btnGuardar.disabled = true;
-    }
-
-    window.resetFormVenta = resetFormVenta;
+    window.resetFormVenta = function () {
+        setTimeout(function () { carrito.innerHTML = ''; agregarLineaVenta(); }, 0);
+    };
     window.recalcular = recalcular;
 
     selectTipo.addEventListener('change', recalcular);
-    inputKg.addEventListener('input', recalcular);
     inputCliente.addEventListener('input', recalcular);
     inputDestino.addEventListener('input', recalcular);
 
-    recalcular();
+    if (PREVIAS.length) {
+        PREVIAS.forEach(function (l) { agregarLineaVenta(l.producto, l.cantidad); });
+    } else {
+        agregarLineaVenta();
+    }
 }());
 
 function abrirModalDespachoDesdeBtn(btn) {

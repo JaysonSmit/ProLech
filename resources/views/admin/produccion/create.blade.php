@@ -94,9 +94,9 @@
     {{-- ── FORMULARIO ──────────────────────────────────────────────────── --}}
     <div class="card">
         <div class="card-header">
-            <h3>➕ Registrar nuevo lote</h3>
+            <h3>➕ Nueva orden de producción</h3>
             <span style="font-size:.75rem;color:var(--text-muted)">
-                Código generado automáticamente · PRD-{{ now()->format('Ymd') }}-NNN
+                Un lote por producto · PRD-{{ now()->format('Ymd') }}-NNN · orden ORD-{{ now()->format('Ymd') }}-NNN
             </span>
         </div>
         <div class="card-body">
@@ -104,91 +104,52 @@
                   id="form-lote" autocomplete="off">
                 @csrf
 
-                {{-- RECETA --}}
+                {{-- PRODUCTOS DE LA ORDEN (varias líneas) --}}
                 <div style="margin-bottom:18px">
-                    <label for="receta_id" style="display:block;font-size:.72rem;font-weight:700;
-                        text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">
-                        Producto / Receta <span style="color:var(--red)">*</span>
-                    </label>
-                    <select id="receta_id" name="receta_id" required
-                            style="width:100%;padding:10px 14px;border:1.5px solid {{ $errors->has('receta_id') ? 'var(--red)' : 'var(--border)' }};
-                                   border-radius:8px;font-size:.9rem;background:#fff;font-family:inherit">
-                        <option value="">— Selecciona un producto —</option>
-                        @foreach($recetas as $receta)
-                            <option value="{{ $receta->id }}"
-                                data-rendimiento="{{ $receta->rendimiento_esperado_unidades }}"
-                                data-nombre="{{ $receta->nombre }}"
-                                data-detalles="{{ json_encode(
-                                    $receta->detalles->map(fn($d) => [
-                                        'nombre'         => $d->insumo->nombre,
-                                        'unidad'         => $d->insumo->unidad_medida,
-                                        'cantidad_base'  => (float) $d->cantidad_requerida,
-                                        'costo_unitario' => (float) $d->insumo->costo_unitario,
-                                        'stock_actual'   => (float) $d->insumo->stock_actual,
-                                    ])
-                                ) }}"
-                                {{ old('receta_id') == $receta->id ? 'selected' : '' }}>
-                                {{ $receta->nombre }}
-                                &nbsp;·&nbsp; rinde {{ $receta->rendimiento_esperado_unidades }}
-                                {{ $receta->rendimiento_esperado_unidades == 1 ? 'unidad' : 'unidades' }} base
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('receta_id')<span style="color:var(--red);font-size:.75rem">{{ $message }}</span>@enderror
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                        <label style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted)">
+                            Productos a producir <span style="color:var(--red)">*</span>
+                            <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">
+                                — puedes agregar varios en la misma orden
+                            </span>
+                        </label>
+                        <span id="lineas-contador" style="font-size:.75rem;color:var(--text-muted)"></span>
+                    </div>
 
-                    {{-- Chips de recetas rápidas --}}
+                    <div id="lineas" style="display:flex;flex-direction:column;gap:10px"></div>
+                    <style>
+                        #lineas select, #lineas input { min-width: 0; }
+                        @media (max-width: 700px) {
+                            #lineas .linea { grid-template-columns: 1fr 1fr 36px !important; }
+                            #lineas .linea select { grid-column: 1 / -1; }
+                        }
+                    </style>
+
+                    @if($errors->has('lineas') || $errors->has('lineas.*'))
+                        <span style="color:var(--red);font-size:.78rem;display:block;margin-top:6px">
+                            {{ $errors->first('lineas') ?: collect($errors->get('lineas.*'))->flatten()->first() }}
+                        </span>
+                    @endif
+
+                    <button type="button" onclick="agregarLinea()" id="btn-agregar"
+                            style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--brand-light);
+                                   background:#f5f9ff;color:var(--brand-light);border-radius:10px;font-weight:700;
+                                   font-size:.85rem;cursor:pointer;font-family:inherit">
+                        ➕ Agregar otro producto
+                    </button>
+
+                    {{-- Chips: agregan el producto a la orden --}}
                     @if($recetas->count() > 0)
                     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
-                        @foreach($recetas->take(6) as $r)
-                        <button type="button"
-                                onclick="document.getElementById('receta_id').value='{{ $r->id }}';
-                                         document.getElementById('receta_id').dispatchEvent(new Event('change'))"
+                        @foreach($recetas as $r)
+                        <button type="button" onclick="agregarLinea({{ $r->id }})"
                                 style="padding:4px 12px;border:1.5px solid var(--border);background:var(--bg);
-                                       border-radius:20px;font-size:.75rem;cursor:pointer;font-weight:500;
-                                       color:var(--text-2);transition:all .15s"
-                                onmouseover="this.style.borderColor='var(--brand-light)';this.style.color='var(--brand-light)'"
-                                onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-2)'">
-                            {{ $r->nombre }}
+                                       border-radius:20px;font-size:.75rem;cursor:pointer;font-weight:500;color:var(--text-2)">
+                            + {{ $r->nombre }}
                         </button>
                         @endforeach
                     </div>
                     @endif
-                </div>
-
-                {{-- CANTIDAD --}}
-                <div style="margin-bottom:18px">
-                    <label for="cantidad_producida" style="display:block;font-size:.72rem;font-weight:700;
-                        text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:6px">
-                        Cantidad a producir <span style="color:var(--red)">*</span>
-                        <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:.7rem">
-                            — unidades / litros / kg según receta
-                        </span>
-                    </label>
-                    <div style="display:flex;gap:8px;align-items:center">
-                        <input type="number" id="cantidad_producida" name="cantidad_producida"
-                               min="1" max="999999" step="1" required
-                               value="{{ old('cantidad_producida') }}"
-                               placeholder="Ej: 1300"
-                               style="flex:1;padding:12px 16px;border:1.5px solid {{ $errors->has('cantidad_producida') ? 'var(--red)' : 'var(--border)' }};
-                                      border-radius:8px;font-size:1.4rem;font-weight:800;
-                                      letter-spacing:-0.5px;font-family:inherit">
-                        <span id="lbl-unidad"
-                              style="font-size:.85rem;color:var(--text-muted);white-space:nowrap;
-                                     min-width:60px;text-align:center">unidades</span>
-                    </div>
-                    @error('cantidad_producida')<span style="color:var(--red);font-size:.75rem">{{ $message }}</span>@enderror
-
-                    {{-- Botones de cantidad rápida --}}
-                    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-                        @foreach([100, 500, 1000, 1300, 1400, 2000] as $v)
-                        <button type="button"
-                                onclick="document.getElementById('cantidad_producida').value='{{ $v }}';
-                                         document.getElementById('cantidad_producida').dispatchEvent(new Event('input'))"
-                                style="padding:3px 11px;border:1.5px solid var(--border);background:var(--bg);
-                                       border-radius:6px;font-size:.75rem;cursor:pointer;font-weight:600;
-                                       color:var(--text-muted)">{{ number_format($v) }}</button>
-                        @endforeach
-                    </div>
                 </div>
 
                 {{-- OBSERVACIONES --}}
@@ -207,10 +168,9 @@
                     <button type="submit" id="btn-guardar" disabled
                             class="btn btn-primary btn-lg"
                             style="opacity:.45;cursor:not-allowed">
-                        💾 Registrar lote
+                        💾 Registrar producción
                     </button>
-                    <button type="reset" class="btn btn-ghost"
-                            onclick="setTimeout(actualizarProyeccion, 15)">
+                    <button type="button" class="btn btn-ghost" onclick="limpiarOrden()">
                         Limpiar
                     </button>
                 </div>
@@ -240,7 +200,7 @@
             <div id="proy-empty" style="padding:36px 20px;text-align:center;color:var(--text-muted)">
                 <div style="font-size:2.2rem;margin-bottom:8px">🧮</div>
                 <div style="font-size:.83rem;line-height:1.5">
-                    Selecciona un producto para ver<br>los insumos que se consumirán.
+                    Agrega productos para ver<br>los insumos que se consumirán en total.
                 </div>
             </div>
 
@@ -279,13 +239,13 @@
                      style="display:none;margin-top:12px;padding:10px 13px;
                             background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;
                             font-size:.8rem;color:#dc2626;font-weight:600">
-                    ⛔ Stock insuficiente — repón antes de producir.
+                    ⛔ Stock insuficiente para la orden completa — baja cantidades o repón insumos.
                 </div>
                 <div id="proy-alerta-ok"
                      style="display:none;margin-top:12px;padding:10px 13px;
                             background:#dcfce7;border:1px solid #86efac;border-radius:8px;
                             font-size:.8rem;color:#15803d;font-weight:600">
-                    ✅ Stock suficiente. Puedes registrar el lote.
+                    ✅ Stock suficiente para toda la orden.
                 </div>
             </div>
         </div>
@@ -314,11 +274,11 @@
                         </div>
                     </div>
                     <button type="button"
-                            onclick="seleccionarReceta({{ $r->id }})"
+                            onclick="agregarLinea({{ $r->id }})"
                             style="padding:4px 12px;background:var(--brand-light);color:#fff;
                                    border:none;border-radius:6px;font-size:.75rem;cursor:pointer;
                                    font-weight:600">
-                        Usar
+                        + Agregar
                     </button>
                 </div>
                 @endforeach
@@ -368,6 +328,9 @@
                                          background:#f0fdf4;padding:2px 8px;border-radius:5px">
                                 {{ $lote->codigo_lote }}
                             </span>
+                            @if($lote->orden_codigo)
+                                <div style="font-size:.68rem;color:var(--text-muted);margin-top:3px">📦 {{ $lote->orden_codigo }}</div>
+                            @endif
                         </td>
                         <td style="font-weight:600;font-size:.88rem">
                             {{ $lote->receta->nombre ?? '—' }}
@@ -409,21 +372,35 @@
     @endif
 </div>
 
+@php
+    $recetasJs = $recetas->mapWithKeys(fn ($r) => [$r->id => [
+        'nombre'      => $r->nombre,
+        'rendimiento' => max(1, (int) $r->rendimiento_esperado_unidades),
+        'insumos'     => $r->detalles->map(fn ($d) => [
+            'id'             => $d->insumo->id,
+            'nombre'         => $d->insumo->nombre,
+            'unidad'         => $d->insumo->unidad_medida,
+            'cantidad_base'  => (float) $d->cantidad_requerida,
+            'costo_unitario' => (float) $d->insumo->costo_unitario,
+            'stock_actual'   => (float) $d->insumo->stock_actual,
+        ])->values(),
+    ]]);
+    $lineasPrevias = collect(old('lineas', []))->values();
+@endphp
 {{-- ══════════════════════════════════════════════════════════════════════
-     JAVASCRIPT — Proyección en tiempo real (BUG CORREGIDO)
-     FIX: la proyección se muestra en cuanto se selecciona la receta,
-     aunque la cantidad aún esté en 0. El botón queda deshabilitado
-     hasta que la cantidad > 0 Y el stock alcance.
+     JAVASCRIPT — Orden con varios productos y proyección sumada de insumos
+     Los insumos compartidos (leche cruda, azúcar…) se suman entre productos:
+     el botón solo se activa si alcanza el stock para TODA la orden.
 ══════════════════════════════════════════════════════════════════════ --}}
 <script>
 (function () {
     'use strict';
 
-    var selReceta  = document.getElementById('receta_id');
-    var inputCant  = document.getElementById('cantidad_producida');
+    var RECETAS = @json($recetasJs);
+    var PREVIAS = @json($lineasPrevias);
+    var contenedor = document.getElementById('lineas');
     var btnGuardar = document.getElementById('btn-guardar');
-    var lblUnidad  = document.getElementById('lbl-unidad');
-
+    var contador   = document.getElementById('lineas-contador');
     var proEmpty   = document.getElementById('proy-empty');
     var proContent = document.getElementById('proy-content');
     var proProducto= document.getElementById('proy-producto');
@@ -434,170 +411,165 @@
     var proAOk     = document.getElementById('proy-alerta-ok');
     var badgeOk    = document.getElementById('proy-badge-ok');
     var badgeErr   = document.getElementById('proy-badge-err');
+    var siguiente  = 0;
 
     function fmt(v, d) {
         d = d !== undefined ? d : 2;
-        return parseFloat(v).toLocaleString('es-PE', {
-            minimumFractionDigits: d, maximumFractionDigits: d
-        });
+        return Number(v).toLocaleString('es-PE', { minimumFractionDigits: d, maximumFractionDigits: d });
     }
     function sol(v) { return 'S/ ' + fmt(v, 2); }
+    function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+    function opciones(seleccion) {
+        var html = '<option value="">— Producto —</option>';
+        Object.keys(RECETAS).forEach(function (id) {
+            html += '<option value="' + id + '"' + (String(seleccion) === id ? ' selected' : '') + '>' + esc(RECETAS[id].nombre) + '</option>';
+        });
+        return html;
+    }
+
+    window.agregarLinea = function (recetaId, cantidad) {
+        // Si el producto ya está en la orden, solo se enfoca su cantidad
+        if (recetaId) {
+            var existente = contenedor.querySelector('select[data-receta-sel] option[value="' + recetaId + '"]:checked');
+            if (existente) {
+                existente.closest('.linea').querySelector('input[type=number]').focus();
+                return;
+            }
+        }
+        var i = siguiente++;
+        var fila = document.createElement('div');
+        fila.className = 'linea';
+        fila.style.cssText = 'display:grid;grid-template-columns:1fr 150px auto 36px;gap:8px;align-items:center;' +
+            'padding:10px;border:1.5px solid var(--border);border-radius:10px;background:#fff';
+        fila.innerHTML =
+            '<select data-receta-sel name="lineas[' + i + '][receta_id]" required ' +
+            'style="padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;font-family:inherit;background:#fff">' +
+            opciones(recetaId || '') + '</select>' +
+            '<input type="number" name="lineas[' + i + '][cantidad]" min="1" max="99999" step="1" required placeholder="Cantidad" ' +
+            'value="' + (cantidad || '') + '" style="padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;' +
+            'font-size:1rem;font-weight:800;font-family:inherit">' +
+            '<span data-costo style="font-size:.78rem;color:var(--text-muted);white-space:nowrap;min-width:90px;text-align:right">—</span>' +
+            '<button type="button" title="Quitar" style="border:none;background:#fef2f2;color:#dc2626;border-radius:8px;' +
+            'height:36px;font-size:1rem;cursor:pointer">✕</button>';
+        fila.querySelector('select').addEventListener('change', actualizarProyeccion);
+        fila.querySelector('input').addEventListener('input', actualizarProyeccion);
+        fila.querySelector('button').addEventListener('click', function () { fila.remove(); actualizarProyeccion(); });
+        contenedor.appendChild(fila);
+        actualizarProyeccion();
+        (recetaId ? fila.querySelector('input') : fila.querySelector('select')).focus();
+    };
+
+    window.limpiarOrden = function () {
+        contenedor.innerHTML = '';
+        document.getElementById('observaciones').value = '';
+        agregarLinea();
+    };
+
+    function leerLineas() {
+        return Array.prototype.map.call(contenedor.querySelectorAll('.linea'), function (fila) {
+            return {
+                fila: fila,
+                recetaId: fila.querySelector('select').value,
+                cantidad: Math.max(0, parseInt(fila.querySelector('input').value, 10) || 0)
+            };
+        });
+    }
 
     function actualizarProyeccion() {
-        var opcion   = selReceta.options[selReceta.selectedIndex];
-        var recetaId = parseInt(selReceta.value, 10);
+        var lineas = leerLineas();
+        var validas = lineas.filter(function (l) { return l.recetaId && RECETAS[l.recetaId] && l.cantidad > 0; });
+        contador.textContent = lineas.length + (lineas.length === 1 ? ' producto' : ' productos');
 
-        /* ── Sin receta → vacío total ──────────────────────────────────── */
-        if (!recetaId) {
-            proEmpty.style.display   = 'block';
+        // Insumos sumados entre todos los productos
+        var insumos = {}, costoTotal = 0, unidadesTotal = 0;
+        lineas.forEach(function (l) {
+            var costoLinea = 0;
+            var r = RECETAS[l.recetaId];
+            if (r && l.cantidad > 0) {
+                r.insumos.forEach(function (d) {
+                    var necesario = (d.cantidad_base / r.rendimiento) * l.cantidad;
+                    var item = insumos[d.id] || (insumos[d.id] = {
+                        nombre: d.nombre, unidad: d.unidad, stock: d.stock_actual, necesario: 0, costo: 0, productos: []
+                    });
+                    item.necesario += necesario;
+                    item.costo += necesario * d.costo_unitario;
+                    if (item.productos.indexOf(r.nombre) < 0) item.productos.push(r.nombre);
+                    costoLinea += necesario * d.costo_unitario;
+                });
+                unidadesTotal += l.cantidad;
+            }
+            costoTotal += costoLinea;
+            l.fila.querySelector('[data-costo]').textContent = costoLinea > 0 ? sol(costoLinea) : '—';
+        });
+
+        if (validas.length === 0) {
+            proEmpty.style.display = 'block';
             proContent.style.display = 'none';
-            badgeOk.style.display    = 'none';
-            badgeErr.style.display   = 'none';
-            setBoton(false, 'Selecciona una receta');
-            if (lblUnidad) lblUnidad.textContent = 'unidades';
+            badgeOk.style.display = badgeErr.style.display = 'none';
+            setBoton(false);
             return;
         }
 
-        /* ── Cantidad (puede ser 0 mientras escribe) ───────────────────── */
-        var cantidad = Math.max(0, parseInt(inputCant.value, 10) || 0);
-
-        /* Leer detalles del <option> */
-        var detalles;
-        try { detalles = JSON.parse(opcion.dataset.detalles || '[]'); }
-        catch (e) { detalles = []; }
-
-        var rendBase = parseInt(opcion.dataset.rendimiento, 10) || 1;
-        var nombre   = opcion.dataset.nombre || opcion.text;
-
-        /* Mostrar nombre del producto seleccionado */
-        if (proProducto) {
-            proProducto.textContent = '🧀 ' + nombre;
-        }
-
-        /* Actualizar etiqueta de unidad (primer insumo define la unidad de producción) */
-        if (lblUnidad && detalles.length > 0) {
-            lblUnidad.textContent = 'unidades';
-        }
-
-        /* ── Calcular insumos (regla de 3) ─────────────────────────────── */
         var hayProblema = false;
-        var costoTotal  = 0;
-        var filas       = [];
-
-        detalles.forEach(function (d) {
-            var cantNecesaria = cantidad > 0
-                ? (d.cantidad_base / rendBase) * cantidad
-                : 0;
-            var costoParcial = cantNecesaria * d.costo_unitario;
-            var alcanza      = cantidad === 0 || d.stock_actual >= cantNecesaria;
-            var faltante     = alcanza ? 0 : cantNecesaria - d.stock_actual;
-            var pct          = d.stock_actual > 0 && cantNecesaria > 0
-                ? Math.min(100, Math.round((cantNecesaria / d.stock_actual) * 100))
-                : 0;
-
-            if (cantidad > 0 && !alcanza) hayProblema = true;
-            costoTotal += costoParcial;
-
-            filas.push({ nombre: d.nombre, unidad: d.unidad,
-                cantNecesaria: cantNecesaria, costoParcial: costoParcial,
-                stockActual: d.stock_actual, alcanza: alcanza,
-                faltante: faltante, pct: pct });
+        var filas = Object.keys(insumos).map(function (id) {
+            var f = insumos[id];
+            f.alcanza = f.stock >= f.necesario;
+            f.pct = f.stock > 0 ? Math.min(100, Math.round(f.necesario / f.stock * 100)) : 100;
+            if (!f.alcanza) hayProblema = true;
+            return f;
         });
 
-        /* ── Renderizar lista de insumos ───────────────────────────────── */
-        proLista.innerHTML = filas.length === 0
-            ? '<div style="color:var(--text-muted);font-size:.82rem;text-align:center;padding:10px">Sin ingredientes configurados</div>'
-            : filas.map(function (f) {
-                var cFondo  = f.alcanza ? '#f0fdf4' : '#fef2f2';
-                var cBorde  = f.alcanza ? '#86efac' : '#fca5a5';
-                var cTexto  = f.alcanza ? '#15803d' : '#dc2626';
-                var icono   = cantidad === 0 ? '📦' : (f.alcanza ? '✅' : '⚠️');
-                var cBarra  = f.pct > 85 ? '#f59e0b' : '#22c55e';
-                if (!f.alcanza) cBarra = '#ef4444';
+        proProducto.innerHTML = validas.map(function (l) {
+            return '🧀 ' + esc(RECETAS[l.recetaId].nombre) + ' <span style="color:var(--text-muted);font-weight:500">× ' + fmt(l.cantidad, 0) + '</span>';
+        }).join('<br>');
 
-                return '<div style="padding:10px 12px;border:1px solid ' + cBorde + ';' +
-                    'border-radius:8px;background:' + cFondo + ';font-size:.81rem">' +
+        proLista.innerHTML = filas.map(function (f) {
+            var cFondo = f.alcanza ? '#f0fdf4' : '#fef2f2', cBorde = f.alcanza ? '#86efac' : '#fca5a5';
+            var cTexto = f.alcanza ? '#15803d' : '#dc2626';
+            var cBarra = !f.alcanza ? '#ef4444' : (f.pct > 85 ? '#f59e0b' : '#22c55e');
+            return '<div style="padding:10px 12px;border:1px solid ' + cBorde + ';border-radius:8px;background:' + cFondo + ';font-size:.81rem">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+                '<span style="font-weight:700">' + (f.alcanza ? '✅' : '⚠️') + ' ' + esc(f.nombre) + '</span>' +
+                '<span style="font-weight:700;color:' + cTexto + '">' + sol(f.costo) + '</span></div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:.76rem;color:var(--text-muted);margin-bottom:7px">' +
+                '<div>Necesario: <strong style="color:#0f172a">' + fmt(f.necesario, 3) + ' ' + esc(f.unidad) + '</strong></div>' +
+                '<div>En stock: <strong style="color:' + cTexto + '">' + fmt(f.stock, 2) + ' ' + esc(f.unidad) + '</strong></div>' +
+                (f.productos.length > 1 ? '<div style="grid-column:1/-1">Compartido por: ' + f.productos.map(esc).join(', ') + '</div>' : '') +
+                (!f.alcanza ? '<div style="color:#dc2626;font-weight:600;grid-column:1/-1">⛔ Faltan ' + fmt(f.necesario - f.stock, 3) + ' ' + esc(f.unidad) + '</div>' : '') +
+                '</div><div style="background:rgba(0,0,0,.07);border-radius:4px;height:4px;overflow:hidden">' +
+                '<div style="width:' + f.pct + '%;height:100%;background:' + cBarra + ';border-radius:4px;transition:width .4s ease"></div></div></div>';
+        }).join('');
 
-                    '<div style="display:flex;justify-content:space-between;' +
-                    'align-items:center;margin-bottom:6px">' +
-                    '<span style="font-weight:700">' + icono + ' ' + f.nombre + '</span>' +
-                    '<span style="font-weight:700;color:' + cTexto + '">' +
-                    (cantidad > 0 ? sol(f.costoParcial) : '—') + '</span></div>' +
-
-                    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;' +
-                    'font-size:.76rem;color:var(--text-muted);margin-bottom:7px">' +
-                    '<div>Necesario: <strong style="color:#0f172a">' +
-                    (cantidad > 0 ? fmt(f.cantNecesaria, 3) + ' ' + f.unidad : '—') +
-                    '</strong></div>' +
-                    '<div>En stock: <strong style="color:' + cTexto + '">' +
-                    fmt(f.stockActual, 2) + ' ' + f.unidad + '</strong></div>' +
-                    ((!f.alcanza && cantidad > 0) ? '<div style="color:#dc2626;font-weight:600;grid-column:1/-1">' +
-                    '⛔ Faltan ' + fmt(f.faltante, 3) + ' ' + f.unidad + '</div>' : '') +
-                    '</div>' +
-
-                    '<div style="background:rgba(0,0,0,.07);border-radius:4px;height:4px;overflow:hidden">' +
-                    '<div style="width:' + (cantidad > 0 ? f.pct : 0) + '%;height:100%;' +
-                    'background:' + cBarra + ';border-radius:4px;transition:width .4s ease"></div></div>' +
-                    '</div>';
-            }).join('');
-
-        /* ── Totales y alertas ─────────────────────────────────────────── */
-        proTotal.textContent  = cantidad > 0 ? sol(costoTotal) : 'S/ —';
-        proTotal.style.color  = hayProblema ? '#dc2626' : 'var(--brand-light)';
-        porUnidad.textContent = (cantidad > 0 && costoTotal > 0)
-            ? sol(costoTotal / cantidad) + ' por unidad'
-            : 'Ingresa la cantidad para ver el costo';
-
-        if (cantidad === 0) {
-            proAErr.style.display  = 'none';
-            proAOk.style.display   = 'none';
-            badgeOk.style.display  = 'none';
-            badgeErr.style.display = 'none';
-        } else if (hayProblema) {
-            proAErr.style.display  = 'block';
-            proAOk.style.display   = 'none';
-            badgeErr.style.display = 'inline-block';
-            badgeOk.style.display  = 'none';
-        } else {
-            proAErr.style.display  = 'none';
-            proAOk.style.display   = 'block';
-            badgeOk.style.display  = 'inline-block';
-            badgeErr.style.display = 'none';
-        }
-
-        /* ── Mostrar panel ─────────────────────────────────────────────── */
-        proEmpty.style.display   = 'none';
+        proTotal.textContent = sol(costoTotal);
+        proTotal.style.color = hayProblema ? '#dc2626' : 'var(--brand-light)';
+        porUnidad.textContent = validas.length + (validas.length === 1 ? ' producto · ' : ' productos · ') + fmt(unidadesTotal, 0) + ' unidades';
+        proAErr.style.display = hayProblema ? 'block' : 'none';
+        proAOk.style.display = hayProblema ? 'none' : 'block';
+        badgeErr.style.display = hayProblema ? 'inline-block' : 'none';
+        badgeOk.style.display = hayProblema ? 'none' : 'inline-block';
+        proEmpty.style.display = 'none';
         proContent.style.display = 'block';
 
-        /* ── Botón guardar ─────────────────────────────────────────────── */
-        var puedeGuardar = recetaId > 0 && cantidad > 0 && !hayProblema;
-        setBoton(puedeGuardar, puedeGuardar ? '💾 Registrar lote' : null);
+        var todasCompletas = lineas.every(function (l) { return l.recetaId && l.cantidad > 0; });
+        setBoton(todasCompletas && !hayProblema, validas.length);
     }
 
-    function setBoton(activo, texto) {
-        btnGuardar.disabled      = !activo;
+    function setBoton(activo, cuantos) {
+        btnGuardar.disabled = !activo;
         btnGuardar.style.opacity = activo ? '1' : '.45';
-        btnGuardar.style.cursor  = activo ? 'pointer' : 'not-allowed';
-        if (texto) btnGuardar.textContent = texto;
-        if (activo) btnGuardar.textContent = '💾 Registrar lote';
+        btnGuardar.style.cursor = activo ? 'pointer' : 'not-allowed';
+        btnGuardar.textContent = cuantos > 1 ? '💾 Registrar orden (' + cuantos + ' lotes)' : '💾 Registrar producción';
     }
-
-    /* Seleccionar receta desde los botones "Usar" del panel lateral */
-    window.seleccionarReceta = function (id) {
-        selReceta.value = id;
-        selReceta.dispatchEvent(new Event('change'));
-        selReceta.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        selReceta.focus();
-    };
 
     window.actualizarProyeccion = actualizarProyeccion;
 
-    selReceta.addEventListener('change', actualizarProyeccion);
-    inputCant.addEventListener('input',  actualizarProyeccion);
-
-    /* Restaurar estado al volver con errores (old values) */
-    if (selReceta.value) actualizarProyeccion();
-
+    // Volver con errores: se restauran las líneas enviadas
+    if (PREVIAS.length) {
+        PREVIAS.forEach(function (l) { agregarLinea(l.receta_id, l.cantidad); });
+    } else {
+        agregarLinea();
+    }
 }());
 </script>
 

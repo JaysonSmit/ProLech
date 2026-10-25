@@ -179,7 +179,7 @@ class AdminDashboardController extends Controller
         $destinoFiltro  = $request->query('destino');
         $despachoFiltro = $request->query('despacho');
 
-        $ventas = Venta::with('registrador:id,name')
+        $ventas = Venta::with(['registrador:id,name', 'detalles'])
                        ->when($destinoFiltro, fn ($q) => $q->where('destino', $destinoFiltro))
                        ->when($despachoFiltro, fn ($q) => $q->where('estado_despacho', $despachoFiltro))
                        ->orderByDesc('fecha_venta')
@@ -215,8 +215,10 @@ class AdminDashboardController extends Controller
         $stockMinimoQuesos = (float) (\App\Models\Configuracion::get('stock_minimo_venta_directa') ?? \App\Models\Configuracion::get('stock_minimo_quesos', 15));
         $alertaStockQuesos = Produccion::alertaStockMinimo();
 
+        $catalogo = app(\App\Services\VentaService::class)->catalogo();
+
         return view('admin.ventas', compact(
-            'ventas', 'resumenMes', 'resumenDestino', 'precios',
+            'ventas', 'catalogo', 'resumenMes', 'resumenDestino', 'precios',
             'stockActualQuesos', 'stockMinimoQuesos', 'alertaStockQuesos',
             'despachosPendientes', 'despachosEnCamino', 'despachosEntregados',
             'destinoFiltro', 'despachoFiltro'
@@ -229,17 +231,25 @@ class AdminDashboardController extends Controller
             'cliente'        => ['required', 'string', 'max:150'],
             'tipo_cliente'   => ['required', Rule::in(['mayorista', 'publico'])],
             'destino'        => ['required', 'string', 'max:100'],
-            'cantidad_kg'    => ['required', 'numeric', 'min:0.001'],
             'fecha_venta'    => ['required', 'date', 'before_or_equal:today'],
             'guia_remision'  => ['nullable', 'string', 'max:60'],
             'notas_despacho' => ['nullable', 'string', 'max:500'],
+            'lineas'            => ['required', 'array', 'min:1', 'max:30'],
+            'lineas.*.producto' => ['required', 'string', 'max:20'],
+            'lineas.*.cantidad' => ['required', 'numeric', 'min:0.001', 'max:99999'],
+        ], [
+            'lineas.required'       => 'Agrega al menos un producto al carrito.',
+            'lineas.*.cantidad.min' => 'Cada producto necesita una cantidad mayor a 0.',
         ]);
 
-        // Precio dinámico desde configuración
-        $validated['precio_unitario'] = Venta::precioParaTipo($validated['tipo_cliente']);
-        $validated['registrado_por']  = $request->user()->id;
+        $lineas = $validated['lineas'];
+        unset($validated['lineas']);
 
-        $venta = Venta::create($validated);
+        try {
+            $venta = app(\App\Services\VentaService::class)->registrar($validated, $lineas, $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->withInput()->withErrors(['lineas' => $e->getMessage()]);
+        }
 
         \App\Services\AuditoriaService::registrar(
             user:            $request->user(),
@@ -252,7 +262,8 @@ class AdminDashboardController extends Controller
         );
 
         return redirect()->route('admin.ventas')
-                         ->with('success', "✅ Venta #{$venta->id} registrada correctamente con destino {$venta->destino}.");
+                         ->with('success', "✅ Venta #{$venta->id} registrada: {$venta->detalles->count()} producto(s) · S/ "
+                             . number_format($venta->total, 2) . " con destino {$venta->destino}.");
     }
 
     public function actualizarDespacho(Request $request, Venta $venta): RedirectResponse

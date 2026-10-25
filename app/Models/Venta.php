@@ -32,6 +32,9 @@ class Venta extends Model
         'total'           => 'float',
     ];
 
+    /** La venta con carrito ya trae su total (suma de las líneas); no se recalcula con kg × precio. */
+    public bool $totalDesdeDetalles = false;
+
     // Precios de referencia del negocio (como fallback si no hay configuración)
     const PRECIO_MAYORISTA = 20.00;
     const PRECIO_PUBLICO   = 21.00;
@@ -55,11 +58,18 @@ class Venta extends Model
         parent::boot();
 
         static::saving(function (self $model) {
-            $model->total = $model->cantidad_kg * $model->precio_unitario;
+            if (! $model->totalDesdeDetalles) {
+                $model->total = $model->cantidad_kg * $model->precio_unitario;
+            }
             if (empty($model->destino)) {
                 $model->destino = 'Planta / Local';
             }
         });
+    }
+
+    public function detalles()
+    {
+        return $this->hasMany(VentaDetalle::class);
     }
 
     public function registrador()
