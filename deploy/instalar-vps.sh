@@ -2,7 +2,7 @@
 # Instala ProLech en un VPS Ubuntu 24.04 con Nginx + PHP-FPM 8.5 + MySQL + HTTPS (certbot).
 # Uso (como root):  DOMINIO=api.tu-dominio.pe CORREO=tu@correo.pe REPO=https://github.com/tu/prolech-backend.git bash instalar-vps.sh
 set -euo pipefail
-: "${DOMINIO:?Define DOMINIO}"; : "${CORREO:?Define CORREO (avisos de Let's Encrypt)}"; : "${REPO:?Define REPO}"
+: "${DOMINIO:?Define DOMINIO}"; : "${CORREO:?Define CORREO para los avisos del certificado}"; : "${REPO:?Define REPO}"
 APP=/var/www/prolech
 DB_CLAVE=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9' | head -c 28)
 
