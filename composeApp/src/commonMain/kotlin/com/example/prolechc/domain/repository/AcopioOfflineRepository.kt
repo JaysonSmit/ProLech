@@ -15,7 +15,9 @@ interface AcopioOfflineRepository {
         ganaderoNombre: String,
         litros: Double,
         porcentajeAgua: Double,
-        densidad: Double
+        densidad: Double,
+        grasa: Double? = null,
+        fotoLocal: String? = null
     ): Acopio
     suspend fun actualizar(acopio: Acopio): Acopio
     suspend fun eliminar(id: String)

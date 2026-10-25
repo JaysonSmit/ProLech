@@ -16,6 +16,14 @@
     <!-- osmdroid guarda en caché los mosaicos del mapa para verlos sin señal -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!-- Impresora térmica del ticket (Android 12+ pide BLUETOOTH_CONNECT en tiempo de ejecución) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Cámara para la foto de evidencia y la lectura del Lactoscan (opcional) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
     <application>
         <service
             android:name="com.example.prolechc.data.location.ServicioRastreo"

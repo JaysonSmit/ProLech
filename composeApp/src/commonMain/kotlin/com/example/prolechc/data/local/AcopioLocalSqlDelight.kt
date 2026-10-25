@@ -62,6 +62,18 @@ class AcopioLocalSqlDelight(
     override suspend fun borrarFisico(id: String) {
         withContext(dispatcher) { queries.deleteById(id) }
     }
+
+    override suspend fun marcarError(id: String, motivo: String) {
+        withContext(dispatcher) { queries.marcarError(motivo, id) }
+    }
+
+    override suspend fun fotosPendientes(): List<Acopio> = withContext(dispatcher) {
+        queries.selectFotosPendientes().executeAsList().filter { it.fotoLocal != null }.map { it.toDomain() }
+    }
+
+    override suspend fun marcarFotoSubida(id: String) {
+        withContext(dispatcher) { queries.marcarFotoSubida(id) }
+    }
 }
 
 // ── Mappers Entity <-> Dominio ───────────────────────────────────────────────
@@ -75,7 +87,11 @@ fun AcopioEntity.toDomain(): Acopio = Acopio(
     densidad       = densidad,
     estadoCalidad  = EstadoCalidad.valueOf(estadoCalidad),
     actualizadoEn  = actualizadoEn,
-    estadoSync     = EstadoSync.valueOf(estadoSync)
+    estadoSync     = EstadoSync.valueOf(estadoSync),
+    errorSync      = errorSync,
+    grasa          = grasa,
+    fotoLocal      = fotoLocal,
+    fotoSubida     = fotoSubida == 1L
 )
 
 fun Acopio.toEntity(): AcopioEntity = AcopioEntity(
@@ -87,5 +103,9 @@ fun Acopio.toEntity(): AcopioEntity = AcopioEntity(
     densidad       = densidad,
     estadoCalidad  = estadoCalidad.name,
     actualizadoEn  = actualizadoEn,
-    estadoSync     = estadoSync.name
+    estadoSync     = estadoSync.name,
+    errorSync      = errorSync,
+    grasa          = grasa,
+    fotoLocal      = fotoLocal,
+    fotoSubida     = if (fotoSubida) 1L else 0L
 )

@@ -39,8 +39,21 @@ data class Acopio(
     val densidad: Double,
     val estadoCalidad: EstadoCalidad,
     val actualizadoEn: Long,
-    val estadoSync: EstadoSync = EstadoSync.SINCRONIZADO
-)
+    val estadoSync: EstadoSync = EstadoSync.SINCRONIZADO,
+    /** Motivo del rechazo del servidor; mientras exista no se reintenta automáticamente. */
+    val errorSync: String? = null,
+    /** % de grasa leído del Lactoscan. */
+    val grasa: Double? = null,
+    /** Ruta de la foto de evidencia en el celular (solo local). */
+    val fotoLocal: String? = null,
+    val fotoSubida: Boolean = false
+) {
+    /** Compara solo lo que viaja al servidor (ignora estado de sync y datos locales de la foto). */
+    fun mismosDatosQue(otro: Acopio): Boolean =
+        id == otro.id && ganaderoId == otro.ganaderoId && ganaderoNombre == otro.ganaderoNombre &&
+            litros == otro.litros && porcentajeAgua == otro.porcentajeAgua && densidad == otro.densidad &&
+            estadoCalidad == otro.estadoCalidad && actualizadoEn == otro.actualizadoEn && grasa == otro.grasa
+}
 
 /** Resumen de una corrida de sincronización (push + pull). */
 data class ResultadoSync(
@@ -48,7 +61,11 @@ data class ResultadoSync(
     val bajados: Int   = 0,
     val fallidos: Int  = 0,
     val sinSesion: Boolean = false,
-    val sinConexion: Boolean = false
+    val sinConexion: Boolean = false,
+    /** Registros rechazados por el servidor que el chofer debe corregir. */
+    val conError: Int  = 0,
+    /** El servidor respondió 401: hay que volver a iniciar sesión (lo offline se conserva). */
+    val sesionVencida: Boolean = false
 )
 
 /** Ganadero de la ruta del chofer, disponible offline. */

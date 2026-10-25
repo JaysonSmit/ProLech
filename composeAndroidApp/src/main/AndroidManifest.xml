@@ -22,5 +22,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Fotos de evidencia (cámara) y PDFs de tickets (compartir por WhatsApp) -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.archivos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/rutas_archivos" />
+        </provider>
+
     </application>
 </manifest>

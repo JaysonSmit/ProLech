@@ -35,4 +35,5 @@ object ApiConfig {
     const val ACOPIOS_CAMPO = "/api/acopios-campo"
     fun acopioCampo(uuid: String) = "/api/acopios-campo/$uuid"
     fun ubicacionGanadero(id: Int) = "/api/ganaderos/$id/ubicacion"
+    fun fotoAcopio(uuid: String) = "/api/acopios-campo/$uuid/foto"
 }

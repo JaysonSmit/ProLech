@@ -20,6 +20,7 @@ import com.example.prolechc.domain.model.PlanRuta
 import com.example.prolechc.domain.model.Ruta
 import com.example.prolechc.domain.ruta.Geo
 import com.example.prolechc.domain.ruta.PlanificadorRuta
+import com.example.prolechc.domain.ruta.ResumenRuta
 import com.example.prolechc.domain.ruta.coordenada
 import com.example.prolechc.domain.usecase.ObservarAcopiosUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +50,11 @@ data class MiRutaUiState(
     val atendidos: Int = 0,
     val total: Int = 0,
     val recorridoKm: Double = 0.0,
-    val mensaje: String? = null
+    val mensaje: String? = null,
+    /** Se muestra al finalizar la ruta. */
+    val resumen: ResumenRuta? = null,
+    val capacidadLitros: Double = 0.0,
+    val litrosHoy: Double = 0.0
 ) {
     val siguiente: Parada? get() = plan?.orden?.firstOrNull()
     val distanciaSiguienteKm: Double?
@@ -74,16 +79,18 @@ class MiRutaViewModel(
 ) : ViewModel() {
 
     private val mensaje = MutableStateFlow<String?>(null)
+    private val resumen = MutableStateFlow<ResumenRuta?>(null)
     private val plan = MutableStateFlow<PlanRuta?>(null)
     private val cargando = MutableStateFlow(true)
     private val permiso = MutableStateFlow(proveedor.tienePermiso())
     private val inicioDelDia = inicioDelDia()
     private var trabajoPlan: Job? = null
 
-    /** Ganaderos con acopio registrado hoy en el celular (aunque aún no se haya sincronizado). */
-    private val atendidosLocal = observarAcopios().map { acopios ->
-        acopios.filter { it.actualizadoEn >= inicioDelDia }.map { it.ganaderoId.toInt() }.toSet()
-    }
+    /** Acopios de HOY registrados en el celular (aunque aún no se hayan sincronizado). */
+    private val acopiosHoy = observarAcopios().map { acopios -> acopios.filter { it.actualizadoEn >= inicioDelDia } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val atendidosLocal = acopiosHoy.map { acopios -> acopios.map { it.ganaderoId.toInt() }.toSet() }
 
     private val rutaConAtendidos = combine(repositorio.observar(), atendidosLocal) { guardada, locales ->
         guardada?.let {
@@ -98,8 +105,8 @@ class MiRutaViewModel(
         rastreo.recorrido(inicioDelDia),
         rastreo.ultimaLectura,
         combine(rastreo.activo, monitor.enLinea, permiso, ::Triple),
-        mensaje
-    ) { (guardada, planActual, estaCargando), recorrido, lectura, (activo, enLinea, conPermiso), msg ->
+        combine(mensaje, resumen, acopiosHoy, ::Triple)
+    ) { (guardada, planActual, estaCargando), recorrido, lectura, (activo, enLinea, conPermiso), (msg, res, hoy) ->
         val paradas = guardada?.ruta?.paradas.orEmpty()
         val turnos = planActual?.orden?.mapIndexed { i, p -> p.ganaderoId to i + 1 }?.toMap().orEmpty()
         val siguienteId = planActual?.orden?.firstOrNull()?.ganaderoId
@@ -127,7 +134,10 @@ class MiRutaViewModel(
             atendidos    = paradas.count { it.atendido },
             total        = paradas.count { !it.suspendido },
             recorridoKm  = Geo.distanciaTotalKm(recorrido),
-            mensaje      = msg
+            mensaje      = msg,
+            resumen      = res,
+            capacidadLitros = guardada?.ruta?.capacidadLitros ?: 0.0,
+            litrosHoy    = hoy.sumOf { it.litros }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MiRutaUiState())
 
@@ -192,7 +202,21 @@ class MiRutaViewModel(
     fun finalizarRuta() {
         control.detener()
         rastreo.detener()
-        mensaje.value = "Ruta finalizada. Se subirá el recorrido al panel."
+        viewModelScope.launch {
+            val estado = uiState.value
+            resumen.value = ResumenRuta.calcular(
+                acopiosHoy = acopiosHoy.value,
+                paradas    = estado.ruta?.ruta?.paradas.orEmpty(),
+                km         = estado.recorridoKm,
+                inicioMs   = rastreo.inicioRecorrido(inicioDelDia),
+                ahoraMs    = reloj()
+            )
+        }
+    }
+
+    fun cerrarResumen() {
+        resumen.value = null
+        mensaje.value = "Ruta finalizada. El recorrido se sube al panel."
     }
 
     fun limpiarMensaje() = mensaje.update { null }

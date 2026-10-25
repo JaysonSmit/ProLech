@@ -20,7 +20,19 @@ class ConfigLocal(database: AppDatabase) {
     /** Se llama al iniciar la app. */
     fun aplicarServidorGuardado() = ApiConfig.cambiarServidor(servidor())
 
+    /** Correo del último chofer que usó el celular (dueño de los datos offline). */
+    fun ultimoUsuario(): String? = queries.obtenerConfig(CLAVE_USUARIO).executeAsOneOrNull()
+
+    fun guardarUltimoUsuario(email: String) = queries.guardarConfig(CLAVE_USUARIO, email.trim().lowercase())
+
+    /** Nombre del chofer para el ticket del ganadero. */
+    fun nombreChofer(): String = queries.obtenerConfig(CLAVE_NOMBRE).executeAsOneOrNull().orEmpty()
+
+    fun guardarNombreChofer(nombre: String) = queries.guardarConfig(CLAVE_NOMBRE, nombre.trim())
+
     private companion object {
         const val CLAVE_SERVIDOR = "servidor_api"
+        const val CLAVE_USUARIO = "ultimo_usuario"
+        const val CLAVE_NOMBRE = "nombre_chofer"
     }
 }

@@ -130,6 +130,14 @@ fun LoginScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
+                    state.aviso?.let {
+                        Text(
+                            "🔐 $it", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer).padding(10.dp).fillMaxWidth()
+                        )
+                    }
                     state.error?.let {
                         Text(
                             it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,

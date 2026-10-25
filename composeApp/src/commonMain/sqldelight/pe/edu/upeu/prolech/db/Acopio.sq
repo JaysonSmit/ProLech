@@ -12,7 +12,14 @@ CREATE TABLE AcopioEntity (
     -- Timestamp en ms: resolución de conflictos Last-Write-Wins
     actualizadoEn  INTEGER NOT NULL,
     -- 'SINCRONIZADO' | 'PENDIENTE_CREAR' | 'PENDIENTE_ACTUALIZAR' | 'PENDIENTE_ELIMINAR'
-    estadoSync     TEXT    NOT NULL DEFAULT 'SINCRONIZADO'
+    estadoSync     TEXT    NOT NULL DEFAULT 'SINCRONIZADO',
+    -- Motivo por el que el servidor rechazó el registro (no se reintenta hasta corregirlo)
+    errorSync      TEXT,
+    -- % de grasa leído del Lactoscan (opcional)
+    grasa          REAL,
+    -- Foto de evidencia guardada en el celular y si ya se subió al servidor
+    fotoLocal      TEXT,
+    fotoSubida     INTEGER NOT NULL DEFAULT 0
 );
 
 selectAll:
@@ -26,6 +33,11 @@ SELECT *
 FROM AcopioEntity
 WHERE estadoSync != 'SINCRONIZADO';
 
+selectFotosPendientes:
+SELECT *
+FROM AcopioEntity
+WHERE fotoSubida = 0 AND estadoSync = 'SINCRONIZADO';
+
 selectById:
 SELECT *
 FROM AcopioEntity
@@ -35,10 +47,16 @@ upsert:
 INSERT OR REPLACE INTO AcopioEntity VALUES ?;
 
 marcarSincronizado:
-UPDATE AcopioEntity SET estadoSync = 'SINCRONIZADO' WHERE id = ?;
+UPDATE AcopioEntity SET estadoSync = 'SINCRONIZADO', errorSync = NULL WHERE id = ?;
+
+marcarError:
+UPDATE AcopioEntity SET errorSync = ? WHERE id = ?;
+
+marcarFotoSubida:
+UPDATE AcopioEntity SET fotoSubida = 1 WHERE id = ?;
 
 marcarPendienteEliminar:
-UPDATE AcopioEntity SET estadoSync = 'PENDIENTE_ELIMINAR', actualizadoEn = ? WHERE id = ?;
+UPDATE AcopioEntity SET estadoSync = 'PENDIENTE_ELIMINAR', actualizadoEn = ?, errorSync = NULL WHERE id = ?;
 
 deleteById:
 DELETE FROM AcopioEntity WHERE id = ?;

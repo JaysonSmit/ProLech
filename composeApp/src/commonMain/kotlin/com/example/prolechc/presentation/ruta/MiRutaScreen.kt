@@ -71,6 +71,8 @@ fun MiRutaScreen(
         state.mensaje?.let { snackbar.showSnackbar(it); viewModel.limpiarMensaje() }
     }
 
+    state.resumen?.let { r -> DialogoResumen(r, onCerrar = viewModel::cerrarResumen) }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         containerColor = MaterialTheme.colorScheme.background
@@ -225,6 +227,24 @@ private fun Encabezado(state: MiRutaUiState, onActualizar: () -> Unit) {
                 Dato("⏱️", horas(it.duracionMin), "estimado")
             }
             Dato("〰️", "${formato(state.recorridoKm, 1)} km", "hecho hoy")
+        }
+        if (state.capacidadLitros > 0) {
+            val carga = (state.litrosHoy / state.capacidadLitros).toFloat()
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "🚛 ${formato(state.litrosHoy, 0)} / ${formato(state.capacidadLitros, 0)} L en el camión",
+                color = Color(0xFFCFE1FF), fontSize = 12.sp
+            )
+            LinearProgressIndicator(
+                progress = { carga.coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(99.dp)),
+                color = when {
+                    carga >= 0.9f  -> ProLechColores.Error
+                    carga >= 0.75f -> ProLechColores.Caramelo
+                    else           -> ProLechColores.Celeste
+                },
+                trackColor = Color.White.copy(alpha = .15f)
+            )
         }
         TextButton(onClick = onActualizar, modifier = Modifier.align(Alignment.End)) {
             Text("↻ Actualizar ruta", color = Color(0xFF9EC5FF))
@@ -382,6 +402,34 @@ private fun SinRuta(modifier: Modifier, enLinea: Boolean, onReintentar: () -> Un
         )
         Button(onClick = onReintentar, enabled = enLinea, shape = RoundedCornerShape(999.dp)) { Text("Descargar ruta") }
     }
+}
+
+@Composable
+private fun DialogoResumen(r: com.example.prolechc.domain.ruta.ResumenRuta, onCerrar: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text("🏁 Ruta terminada") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("${formato(r.litros, 1)} L", style = MaterialTheme.typography.headlineMedium)
+                Text("${r.entregas} entregas · ${r.atendidos}/${r.totalParadas} ganaderos atendidos")
+                Text("〰️ ${formato(r.km, 1)} km" + (r.minutos?.let { " · ⏱️ ${horas(it)}" } ?: ""))
+                Text(
+                    "Calidad: ✅ ${r.aprobados}  ⚠️ ${r.observados}  ❌ ${r.rechazados}  (${r.porcentajeAprobado} % aprobado)" +
+                        (r.aguaPromedio?.let { " · agua prom. ${formato(it, 1)} %" } ?: "")
+                )
+                if (r.noAtendidos.isNotEmpty()) {
+                    Text(
+                        "Sin visitar (${r.noAtendidos.size}): " + r.noAtendidos.take(8).joinToString(", ") +
+                            if (r.noAtendidos.size > 8) "…" else "",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onCerrar) { Text("Listo") } }
+    )
 }
 
 private fun horas(min: Int): String = if (min < 60) "$min min" else "${min / 60} h ${min % 60} min"

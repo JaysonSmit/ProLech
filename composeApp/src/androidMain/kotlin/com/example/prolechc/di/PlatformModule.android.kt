@@ -51,4 +51,10 @@ actual fun platformModule(): Module = module {
     single<MonitorConectividad> { MonitorConectividadAndroid(androidContext()) }
     single<ProveedorUbicacion> { ProveedorUbicacionAndroid(androidContext()) }
     single<ControlRastreoSegundoPlano> { ControlRastreoAndroid(androidContext()) }
+    single<com.example.prolechc.data.dispositivo.LectorLactoscan> {
+        com.example.prolechc.data.dispositivo.LectorLactoscanAndroid(androidContext())
+    }
+    single<com.example.prolechc.data.dispositivo.AccionesTicket> {
+        com.example.prolechc.data.dispositivo.AccionesTicketAndroid(androidContext())
+    }
 }

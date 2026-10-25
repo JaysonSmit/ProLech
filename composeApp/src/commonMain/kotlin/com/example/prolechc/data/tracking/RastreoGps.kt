@@ -160,6 +160,11 @@ class RastreoGps(
 
     suspend fun pendientes(): Long = withContext(dispatcher) { queries.contarPendientes().executeAsOne() }
 
+    /** Hora (ms) del primer punto GPS desde [desdeMs]: inicio real del recorrido. */
+    suspend fun inicioRecorrido(desdeMs: Long): Long? = withContext(dispatcher) {
+        queries.puntosDesde(desdeMs).executeAsList().firstOrNull()?.registradoEn
+    }
+
     companion object {
         const val LOTE = 200L
         private const val RETENCION_MS = 3L * 24 * 60 * 60 * 1000

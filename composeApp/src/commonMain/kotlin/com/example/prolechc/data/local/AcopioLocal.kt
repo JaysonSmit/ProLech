@@ -19,4 +19,9 @@ interface AcopioLocal {
     suspend fun eliminar(id: String, ahora: Long)
     suspend fun marcarSincronizado(id: String)
     suspend fun borrarFisico(id: String)
+    /** Guarda el motivo del rechazo del servidor: el registro deja de reintentarse solo. */
+    suspend fun marcarError(id: String, motivo: String)
+    /** Acopios ya sincronizados cuya foto de evidencia falta subir. */
+    suspend fun fotosPendientes(): List<Acopio>
+    suspend fun marcarFotoSubida(id: String)
 }

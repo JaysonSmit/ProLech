@@ -4,6 +4,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import com.example.prolechc.presentation.theme.ProLechColores
+import com.example.prolechc.data.dispositivo.rememberSolicitarPermisoBluetooth
+import com.example.prolechc.data.dispositivo.rememberTomarFoto
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +67,12 @@ fun AcopioScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var porEliminar by remember { mutableStateOf<Acopio?>(null) }
+    var ticketDe by remember { mutableStateOf<Acopio?>(null) }
+    val pedirBluetooth = rememberSolicitarPermisoBluetooth { concedido ->
+        val acopio = ticketDe
+        if (concedido && acopio != null) viewModel.imprimirTicket(acopio)
+        ticketDe = null
+    }
 
     LaunchedEffect(state.mensaje) {
         state.mensaje?.let {
@@ -83,6 +93,25 @@ fun AcopioScreen(
                 }) { Text("Eliminar") }
             },
             dismissButton = { TextButton(onClick = { porEliminar = null }) { Text("Cancelar") } }
+        )
+    }
+
+    ticketDe?.let { acopio ->
+        AlertDialog(
+            onDismissRequest = { ticketDe = null },
+            title = { Text("🧾 Ticket para ${acopio.ganaderoNombre}") },
+            text = { Text("${formato(acopio.litros, 2)} L · ${acopio.estadoCalidad.name}\n¿Cómo se lo entregas?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.compartirTicket(acopio)
+                    ticketDe = null
+                }) { Text("📲 WhatsApp / PDF") }
+            },
+            dismissButton = {
+                if (viewModel.puedeImprimir) {
+                    TextButton(onClick = pedirBluetooth) { Text("🖨️ Imprimir") }
+                }
+            }
         )
     }
 
@@ -119,6 +148,7 @@ fun AcopioScreen(
                 FormularioAcopioCard(
                     form      = state.formulario,
                     ganaderos = state.ganaderos,
+                    leyendo   = state.leyendoLactoscan,
                     viewModel = viewModel
                 )
             }
@@ -144,7 +174,8 @@ fun AcopioScreen(
                     acopio     = acopio,
                     editando   = state.formulario.editando?.id == acopio.id,
                     onEditar   = { viewModel.editar(acopio) },
-                    onEliminar = { porEliminar = acopio }
+                    onEliminar = { porEliminar = acopio },
+                    onTicket   = { ticketDe = acopio }
                 )
             }
         }
@@ -162,7 +193,7 @@ private fun ResumenDia(state: AcopioUiState) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "LITROS ACOPIADOS",
+                "LITROS DE HOY",
                 color = Color(0xFF9EC5FF), style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.weight(1f)
             )
@@ -175,13 +206,34 @@ private fun ResumenDia(state: AcopioUiState) {
             )
         }
         Text(
-            "${formato(state.totalLitros, 1)} L",
+            "${formato(state.litrosHoy, 1)} L",
             color = Color.White,
             style = MaterialTheme.typography.headlineMedium
         )
+        // Capacidad del camión: verde → caramelo (≥ 75 %) → rojo (≥ 90 %)
+        state.ocupacionCamion?.let { ocupacion ->
+            val color = when {
+                ocupacion >= 0.9  -> ProLechColores.Error
+                ocupacion >= 0.75 -> ProLechColores.Caramelo
+                else              -> ProLechColores.Celeste
+            }
+            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(
+                    progress = { ocupacion.toFloat().coerceIn(0f, 1f) },
+                    modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(99.dp)),
+                    color = color,
+                    trackColor = Color.White.copy(alpha = .15f)
+                )
+                Text(
+                    "  🚛 ${(ocupacion * 100).toInt()} % de ${formato(state.contexto.capacidadLitros, 0)} L",
+                    color = Color.White, style = MaterialTheme.typography.labelMedium
+                )
+            }
+        }
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip("🧾 ${state.acopios.size} registros")
+            Chip("🧾 ${state.acopiosHoy.size} hoy")
             Chip(if (state.pendientes == 0) "✓ Todo sincronizado" else "⏳ ${state.pendientes} por subir")
+            if (state.conError > 0) Chip("⚠ ${state.conError} con error")
         }
     }
 }
@@ -199,9 +251,12 @@ private fun Chip(texto: String) {
 private fun FormularioAcopioCard(
     form: FormularioAcopio,
     ganaderos: List<GanaderoCampo>,
+    leyendo: Boolean,
     viewModel: AcopioViewModel
 ) {
     val numerico = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+    val fotoLactoscan = rememberTomarFoto(viewModel::onFotoLactoscan)
+    val fotoEvidencia = rememberTomarFoto(viewModel::onFotoEvidencia)
 
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(
@@ -252,6 +307,29 @@ private fun FormularioAcopioCard(
                     label = { Text("Densidad") }, keyboardOptions = numerico,
                     singleLine = true, modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Lectura automática del Lactoscan con la cámara (OCR en el celular, sin señal)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = fotoLactoscan, enabled = !leyendo, modifier = Modifier.weight(1f)) {
+                    if (leyendo) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Text("🔎 Leer Lactoscan")
+                }
+                OutlinedTextField(
+                    value = form.grasa, onValueChange = viewModel::onGrasa,
+                    label = { Text("% Grasa") }, keyboardOptions = numerico,
+                    singleLine = true, modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (form.fotoLocal == null) {
+                    TextButton(onClick = fotoEvidencia) { Text("📸 Foto de evidencia (opcional)") }
+                } else {
+                    Text("📷 Foto adjunta", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                    TextButton(onClick = fotoEvidencia) { Text("Cambiar") }
+                    TextButton(onClick = viewModel::quitarFoto) { Text("Quitar") }
+                }
             }
 
             form.calidadPrevia?.let { calidad ->
@@ -317,15 +395,17 @@ private fun AcopioItem(
     acopio: Acopio,
     editando: Boolean,
     onEditar: () -> Unit,
-    onEliminar: () -> Unit
+    onEliminar: () -> Unit,
+    onTicket: () -> Unit
 ) {
+    val conError = acopio.errorSync != null
     Card(
         modifier  = Modifier.fillMaxWidth().padding(horizontal = 16.dp).clickable(onClick = onEditar),
         elevation = CardDefaults.cardElevation(defaultElevation = if (editando) 6.dp else 2.dp),
-        colors    = if (editando) {
-            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        } else {
-            CardDefaults.cardColors()
+        colors    = when {
+            editando -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            conError -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            else     -> CardDefaults.cardColors()
         }
     ) {
         Row(
@@ -333,10 +413,14 @@ private fun AcopioItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(acopio.ganaderoNombre, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    acopio.ganaderoNombre + if (acopio.fotoLocal != null) "  📷" else "",
+                    style = MaterialTheme.typography.titleSmall
+                )
                 Text(
                     "${formato(acopio.litros, 2)} L · Agua ${formato(acopio.porcentajeAgua, 1)}% · " +
-                        "Dens. ${formato(acopio.densidad, 3)}",
+                        "Dens. ${formato(acopio.densidad, 3)}" +
+                        (acopio.grasa?.let { " · Grasa ${formato(it, 1)}%" } ?: ""),
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
@@ -344,18 +428,30 @@ private fun AcopioItem(
                     style = MaterialTheme.typography.labelMedium,
                     color = colorCalidad(acopio.estadoCalidad)
                 )
-                Text(
-                    text  = when (acopio.estadoSync) {
-                        EstadoSync.SINCRONIZADO         -> "✓ Sincronizado"
-                        EstadoSync.PENDIENTE_CREAR      -> "⏳ Pendiente de subir"
-                        EstadoSync.PENDIENTE_ACTUALIZAR -> "⏳ Cambios pendientes"
-                        EstadoSync.PENDIENTE_ELIMINAR   -> "⏳ Eliminación pendiente"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (conError) {
+                    // Rechazado por el servidor: no se reintenta hasta corregirlo
+                    Text(
+                        text  = "⚠ No se pudo subir: ${acopio.errorSync}. Toca para corregir.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                } else {
+                    Text(
+                        text  = when (acopio.estadoSync) {
+                            EstadoSync.SINCRONIZADO         -> "✓ Sincronizado"
+                            EstadoSync.PENDIENTE_CREAR      -> "⏳ Pendiente de subir"
+                            EstadoSync.PENDIENTE_ACTUALIZAR -> "⏳ Cambios pendientes"
+                            EstadoSync.PENDIENTE_ELIMINAR   -> "⏳ Eliminación pendiente"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
-            TextButton(onClick = onEliminar) { Text("Eliminar") }
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onTicket) { Text("🧾 Ticket") }
+                TextButton(onClick = onEliminar) { Text("Eliminar") }
+            }
         }
     }
 }

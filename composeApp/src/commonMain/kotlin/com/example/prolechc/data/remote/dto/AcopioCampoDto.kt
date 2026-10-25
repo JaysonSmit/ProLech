@@ -16,7 +16,9 @@ data class AcopioCampoDto(
     @SerialName("porcentaje_agua") val porcentajeAgua: Double,
     @SerialName("densidad")        val densidad: Double,
     @SerialName("estado_calidad")  val estadoCalidad: String,
-    @SerialName("actualizado_en")  val actualizadoEn: Long
+    @SerialName("actualizado_en")  val actualizadoEn: Long,
+    @SerialName("grasa")           val grasa: Double? = null,
+    @SerialName("foto_url")        val fotoUrl: String? = null
 )
 
 @Serializable
@@ -32,7 +34,8 @@ fun Acopio.toDto(): AcopioCampoDto = AcopioCampoDto(
     porcentajeAgua = porcentajeAgua,
     densidad       = densidad,
     estadoCalidad  = estadoCalidad.name,
-    actualizadoEn  = actualizadoEn
+    actualizadoEn  = actualizadoEn,
+    grasa          = grasa
 )
 
 /** Lo que llega del servidor siempre se guarda como SINCRONIZADO. */
@@ -46,5 +49,7 @@ fun AcopioCampoDto.toDomain(): Acopio = Acopio(
     estadoCalidad  = EstadoCalidad.entries.firstOrNull { it.name == estadoCalidad.uppercase() }
         ?: EstadoCalidad.evaluar(porcentajeAgua, densidad),
     actualizadoEn  = actualizadoEn,
-    estadoSync     = EstadoSync.SINCRONIZADO
+    estadoSync     = EstadoSync.SINCRONIZADO,
+    grasa          = grasa,
+    fotoSubida     = fotoUrl != null
 )

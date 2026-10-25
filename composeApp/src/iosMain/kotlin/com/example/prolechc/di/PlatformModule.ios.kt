@@ -43,4 +43,10 @@ actual fun platformModule(): Module = module {
     single<MonitorConectividad> { MonitorConectividadIos() }
     single<ProveedorUbicacion> { ProveedorUbicacionIos() }
     single<ControlRastreoSegundoPlano> { ControlRastreoIos() }
+    single<com.example.prolechc.data.dispositivo.LectorLactoscan> {
+        com.example.prolechc.data.dispositivo.LectorLactoscanIos()
+    }
+    single<com.example.prolechc.data.dispositivo.AccionesTicket> {
+        com.example.prolechc.data.dispositivo.AccionesTicketIos()
+    }
 }

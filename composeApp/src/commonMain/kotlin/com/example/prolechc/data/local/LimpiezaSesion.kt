@@ -18,16 +18,24 @@ class LimpiezaSesion(
     private val control: ControlRastreoSegundoPlano,
     private val dispatcher: CoroutineContext = Dispatchers.Default
 ) {
+    /** Acopios o puntos GPS que todavía no llegaron al servidor. */
+    suspend fun hayDatosSinSubir(): Boolean = withContext(dispatcher) {
+        database.acopioQueries.selectPendientes().executeAsList().isNotEmpty()
+    } || rastreo.pendientes() > 0
+
     suspend fun ejecutar() {
         control.detener()
         rastreo.detenerSinSubir()
         rastreo.subirPendientes(finalizado = true)   // con señal, el recorrido no se pierde
+        borrarDatosLocales()
+    }
+
+    suspend fun borrarDatosLocales() {
         withContext(dispatcher) {
             database.transaction {
                 database.puntoGpsQueries.borrarTodosLosPuntos()
                 database.rutaCacheQueries.borrarRuta()
                 database.ganaderoQueries.deleteAllGanaderos()
-                // Solo se llega aquí sin acopios pendientes (lo valida AcopioViewModel)
                 database.acopioQueries.deleteAll()
             }
         }

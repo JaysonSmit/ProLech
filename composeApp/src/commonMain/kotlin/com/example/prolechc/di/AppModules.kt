@@ -26,6 +26,8 @@ import com.example.prolechc.presentation.login.LoginViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 import pe.edu.upeu.prolech.db.AppDatabase
 import com.example.prolechc.data.remote.datasource.AcopioRemoteDataSource
 import com.example.prolechc.data.remote.datasource.AuthRemoteDataSource
@@ -116,19 +118,33 @@ val databaseModule = module {
         )
     }
 
+    single { com.example.prolechc.data.local.EstadoSesion() }
+    single<com.example.prolechc.data.sync.SubidorFotos> {
+        com.example.prolechc.data.remote.datasource.FotoEvidenciaKtor(get())
+    }
+
     single {
         val authRepository = get<AuthRepository>()
+        val tokenStorage = get<com.example.prolechc.data.local.TokenStorage>()
+        val estadoSesion = get<com.example.prolechc.data.local.EstadoSesion>()
         val rutaDia = get<RutaDiaRepositorio>()
+        val scope = get<CoroutineScope>(named(SCOPE_APP))
         SyncManager(
             local          = get(),
             remoto         = get(),
             monitor        = get(),
-            scope          = get(named(SCOPE_APP)),
+            scope          = scope,
             ganaderoLocal  = get(),
             ganaderoRemoto = get(),
             sesionActiva   = { authRepository.isLoggedIn() },
             subidorGps     = get<RastreoGps>(),
-            refrescarRuta  = { rutaDia.refrescar().getOrThrow() }
+            refrescarRuta  = { rutaDia.refrescar().getOrThrow() },
+            subidorFotos   = get(),
+            // 401: se olvida el token (los datos offline se conservan) y la app pide el login
+            alSesionVencida = {
+                estadoSesion.marcarVencida()
+                scope.launch { tokenStorage.clearToken() }
+            }
         )
     }
     single<AcopioOfflineRepository> {
@@ -190,10 +206,27 @@ val viewModelModule = module {
             sincronizarAcopios = get(),
             logout             = get(),
             monitor            = get(),
-            syncManager        = get()
+            syncManager        = get(),
+            lector             = get(),
+            accionesTicket     = get(),
+            contexto           = run {
+                val config = get<com.example.prolechc.data.local.ConfigLocal>()
+                get<RutaDiaRepositorio>().observar().map { guardada ->
+                    com.example.prolechc.presentation.acopios.ContextoRuta(
+                        chofer          = config.nombreChofer(),
+                        ruta            = guardada?.ruta?.rutaNombre.orEmpty(),
+                        capacidadLitros = guardada?.ruta?.capacidadLitros ?: 0.0
+                    )
+                }
+            }
         )
     }
-    viewModel { LoginViewModel(loginUseCase = get(), monitor = get(), syncManager = get(), config = get()) }
+    viewModel {
+        LoginViewModel(
+            loginUseCase = get(), monitor = get(), syncManager = get(),
+            config = get(), estadoSesion = get(), limpieza = get()
+        )
+    }
     viewModel {
         MiRutaViewModel(
             repositorio     = get(),

@@ -20,14 +20,17 @@ class RegistrarAcopioUseCase(private val repository: AcopioOfflineRepository) {
         ganaderoNombre: String,
         litros: Double,
         porcentajeAgua: Double,
-        densidad: Double
+        densidad: Double,
+        grasa: Double? = null,
+        fotoLocal: String? = null
     ): Result<Acopio> = runCatching {
         require(ganaderoId > 0) { "Selecciona un ganadero válido" }
         require(ganaderoNombre.isNotBlank()) { "El nombre del ganadero es obligatorio" }
         require(litros > 0) { "Los litros deben ser mayores a 0" }
         require(porcentajeAgua in 0.0..100.0) { "El % de agua debe estar entre 0 y 100" }
         require(densidad in 1.0..1.1) { "La densidad debe estar entre 1.000 y 1.100" }
-        repository.registrar(ganaderoId, ganaderoNombre.trim(), litros, porcentajeAgua, densidad)
+        require(grasa == null || grasa in 0.0..15.0) { "La grasa debe estar entre 0 y 15 %" }
+        repository.registrar(ganaderoId, ganaderoNombre.trim(), litros, porcentajeAgua, densidad, grasa, fotoLocal)
     }
 }
 

@@ -34,7 +34,9 @@ class AcopioOfflineRepositoryImpl(
         ganaderoNombre: String,
         litros: Double,
         porcentajeAgua: Double,
-        densidad: Double
+        densidad: Double,
+        grasa: Double?,
+        fotoLocal: String?
     ): Acopio {
         val acopio = Acopio(
             id             = generarId(),
@@ -45,7 +47,9 @@ class AcopioOfflineRepositoryImpl(
             densidad       = densidad,
             estadoCalidad  = EstadoCalidad.evaluar(porcentajeAgua, densidad),
             actualizadoEn  = reloj(),
-            estadoSync     = EstadoSync.PENDIENTE_CREAR
+            estadoSync     = EstadoSync.PENDIENTE_CREAR,
+            grasa          = grasa,
+            fotoLocal      = fotoLocal
         )
         local.guardar(acopio)
         syncManager.solicitarSincronizacion()
@@ -63,7 +67,11 @@ class AcopioOfflineRepositoryImpl(
         val actualizado = acopio.copy(
             estadoCalidad = EstadoCalidad.evaluar(acopio.porcentajeAgua, acopio.densidad),
             actualizadoEn = reloj(),
-            estadoSync    = estado
+            estadoSync    = estado,
+            // Al corregirlo, el registro rechazado vuelve a intentarse
+            errorSync     = null,
+            // Foto nueva → hay que volver a subirla
+            fotoSubida    = acopio.fotoSubida && acopio.fotoLocal == previo?.fotoLocal
         )
         local.guardar(actualizado)
         syncManager.solicitarSincronizacion()

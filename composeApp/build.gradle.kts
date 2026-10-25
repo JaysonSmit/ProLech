@@ -97,6 +97,9 @@ kotlin {
             // GPS (FusedLocationProvider) + mapa OpenStreetMap sin API key
             implementation(libs.play.services.location)
             implementation(libs.osmdroid.android)
+
+            // OCR del Lactoscan en el celular (sin internet)
+            implementation("com.google.mlkit:text-recognition:16.0.1")
         }
 
         // ── iosMain ───────────────────────────────────────────────────────────

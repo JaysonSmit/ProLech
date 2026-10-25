@@ -13,7 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
+import com.example.prolechc.data.local.EstadoSesion
 import com.example.prolechc.domain.usecase.VerificarSesionUseCase
+import org.koin.compose.viewmodel.koinViewModel
 import com.example.prolechc.presentation.PantallaPrincipal
 import com.example.prolechc.presentation.login.LoginScreen
 import com.example.prolechc.presentation.theme.ProLechTema
@@ -29,10 +33,22 @@ import org.koin.compose.koinInject
 @Composable
 fun App() {
     val verificarSesion: VerificarSesionUseCase = koinInject()
+    val estadoSesion: EstadoSesion = koinInject()
+    val sesionVencida by estadoSesion.vencida.collectAsState()
     var logueado by remember { mutableStateOf<Boolean?>(null) }
+    // Cada vez que se muestra el login se usa un ViewModel nuevo: el anterior quedaba
+    // con exitoso = true y, tras "Salir", volvía a entrar sin pedir la contraseña.
+    var intentoLogin by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         logueado = verificarSesion()
+    }
+    // El servidor rechazó el token (401): volver al login sin borrar los datos offline
+    LaunchedEffect(sesionVencida) {
+        if (sesionVencida && logueado == true) {
+            intentoLogin++
+            logueado = false
+        }
     }
 
     ProLechTema {
@@ -41,8 +57,14 @@ fun App() {
                 null  -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
-                false -> LoginScreen(onLoginExitoso = { logueado = true })
-                true  -> PantallaPrincipal(onSesionCerrada = { logueado = false })
+                false -> LoginScreen(
+                    onLoginExitoso = { logueado = true },
+                    viewModel = koinViewModel(key = "login-$intentoLogin")
+                )
+                true  -> PantallaPrincipal(onSesionCerrada = {
+                    intentoLogin++
+                    logueado = false
+                })
             }
         }
     }
