@@ -555,7 +555,8 @@
             </button>
         </form>
 
-        {{-- Acceso rápido (demo) --}}
+        {{-- Acceso rápido (demo): SOLO en desarrollo, nunca publicar contraseñas en producción --}}
+        @if(app()->environment('local'))
         <div class="quick-access">
             <div class="quick-access-title">Acceso rápido demo</div>
             <div class="quick-chips">
@@ -573,6 +574,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         <div class="login-footer">
             ProLech ERP &copy; {{ date('Y') }} · Todos los derechos reservados

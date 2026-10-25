@@ -12,11 +12,11 @@ use Illuminate\Support\Facades\Route;
 // ══════════════════════════════════════════════════════════════════════════════
 
 // POST /api/login  ← URL que usa la App Kotlin (BACKEND_API_CONTRACT.md)
-Route::post('login', [AuthController::class, 'login']);
+Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login-api');
 
 // POST /api/auth/login  ← alias para compatibilidad con clientes web / futuros
 Route::prefix('auth')->group(function () {
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login-api');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

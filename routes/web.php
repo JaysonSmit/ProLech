@@ -90,7 +90,7 @@ Route::post('/login', function (Request $request) {
     }
 
     return back()->withErrors(['email' => 'Las credenciales son incorrectas.'])->onlyInput('email');
-})->name('login.post');
+})->middleware('throttle:login-web')->name('login.post');
 
 Route::post('/logout', function (Request $request) {
     Auth::logout();
