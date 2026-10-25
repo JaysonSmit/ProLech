@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\AcopioCampo;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  AcopioCampoController — Sincronización offline-first de la App Kotlin
+//
+//  El celular genera el UUID y guarda primero en SQLDelight; el SyncManager
+//  sube los pendientes cuando hay red. Por eso:
+//   • POST y PUT son idempotentes (UPSERT por uuid): un reintento no duplica.
+//   • Conflictos se resuelven con Last-Write-Wins sobre `actualizado_en` (ms).
+//   • Cada chofer solo ve y modifica sus propios registros.
+// ══════════════════════════════════════════════════════════════════════════════
+
+class AcopioCampoController extends Controller
+{
+    // GET /api/acopios-campo
+    public function index(Request $request): JsonResponse
+    {
+        $acopios = AcopioCampo::where('chofer_id', $request->user()->id)
+                              ->orderByDesc('actualizado_en')
+                              ->get();
+
+        return response()->json([
+            'data' => $acopios->map->toApi()->values(),
+        ]);
+    }
+
+    // POST /api/acopios-campo
+    public function store(Request $request): JsonResponse
+    {
+        $datos = $this->validar($request, conUuid: true);
+
+        return $this->guardar($request, $datos['uuid'], $datos);
+    }
+
+    // PUT /api/acopios-campo/{uuid}
+    public function update(Request $request, string $uuid): JsonResponse
+    {
+        $datos = $this->validar($request, conUuid: false);
+
+        return $this->guardar($request, $uuid, $datos);
+    }
+
+    // DELETE /api/acopios-campo/{uuid}
+    public function destroy(Request $request, string $uuid): JsonResponse
+    {
+        $acopio = AcopioCampo::where('uuid', $uuid)
+                             ->where('chofer_id', $request->user()->id)
+                             ->first();
+
+        if (! $acopio) {
+            return response()->json(['message' => 'Acopio no encontrado.'], 404);
+        }
+
+        $acopio->delete();
+
+        return response()->json(['message' => 'Acopio eliminado.']);
+    }
+
+    // ── Privados ───────────────────────────────────────────────────────────────
+
+    private function validar(Request $request, bool $conUuid): array
+    {
+        $reglas = [
+            'ganadero_id'     => ['required', 'integer', 'min:1'],
+            'ganadero_nombre' => ['required', 'string', 'max:255'],
+            'litros'          => ['required', 'numeric', 'min:0', 'max:99999'],
+            'porcentaje_agua' => ['required', 'numeric', 'min:0', 'max:100'],
+            'densidad'        => ['required', 'numeric', 'min:0', 'max:99'],
+            'estado_calidad'  => ['required', 'in:APROBADO,OBSERVADO,RECHAZADO'],
+            'actualizado_en'  => ['required', 'integer', 'min:0'],
+        ];
+
+        if ($conUuid) {
+            $reglas['uuid'] = ['required', 'uuid'];
+        }
+
+        return $request->validate($reglas);
+    }
+
+    /** UPSERT por uuid aplicando Last-Write-Wins. */
+    private function guardar(Request $request, string $uuid, array $datos): JsonResponse
+    {
+        $choferId = $request->user()->id;
+        $existente = AcopioCampo::where('uuid', $uuid)->first();
+
+        if ($existente && $existente->chofer_id !== $choferId) {
+            return response()->json(['message' => 'No tienes permisos sobre este acopio.'], 403);
+        }
+
+        // El servidor tiene una versión más reciente: se conserva y se devuelve
+        if ($existente && $existente->actualizado_en > (int) $datos['actualizado_en']) {
+            return response()->json(['data' => $existente->toApi()]);
+        }
+
+        $campos = collect($datos)->except('uuid')->all();
+
+        if ($existente) {
+            $existente->update($campos);
+            return response()->json(['data' => $existente->toApi()]);
+        }
+
+        $acopio = AcopioCampo::create($campos + [
+            'uuid'      => $uuid,
+            'chofer_id' => $choferId,
+        ]);
+
+        return response()->json(['data' => $acopio->toApi()], 201);
+    }
+}

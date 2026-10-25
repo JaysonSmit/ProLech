@@ -1,0 +1,93 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use App\Http\Controllers\Controller;
+use App\Models\Notificacion;
+use App\Models\SolicitudRuta;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+class RutasController extends Controller
+{
+    /**
+     * GET /admin/rutas/solicitudes
+     * Lista todas las solicitudes de cambio de ruta con filtros por estado.
+     */
+    public function index(Request $request): View
+    {
+        $estado = $request->query('estado', 'pendiente');
+
+        $solicitudes = SolicitudRuta::with(['chofer:id,name,email', 'revisor:id,name'])
+            ->when($estado !== 'todas', fn ($q) => $q->where('estado', $estado))
+            ->whereNotNull('chofer_id')        // Solo las de choferes (app móvil)
+            ->orderByRaw("FIELD(estado,'pendiente','aprobado','rechazado')")
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $contadores = [
+            'pendiente' => SolicitudRuta::whereNotNull('chofer_id')->where('estado', 'pendiente')->count(),
+            'aprobado'  => SolicitudRuta::whereNotNull('chofer_id')->where('estado', 'aprobado')->count(),
+            'rechazado' => SolicitudRuta::whereNotNull('chofer_id')->where('estado', 'rechazado')->count(),
+        ];
+
+        return view('admin.rutas_solicitudes', compact('solicitudes', 'contadores', 'estado'));
+    }
+
+    /**
+     * POST /admin/rutas/solicitudes/{solicitud}/responder
+     * El admin aprueba o rechaza la solicitud y genera una notificación al chofer.
+     */
+    public function responderSolicitud(Request $request, SolicitudRuta $solicitud): RedirectResponse
+    {
+        $validated = $request->validate([
+            'accion'         => ['required', Rule::in(['aprobado', 'rechazado'])],
+            'nota_respuesta' => ['nullable', 'string', 'max:300'],
+        ]);
+
+        if (! $solicitud->esPendiente()) {
+            return back()->with('error', 'Esta solicitud ya fue procesada anteriormente.');
+        }
+
+        $nuevoEstado = $validated['accion'];
+        $nota        = $validated['nota_respuesta'] ?? '';
+
+        // Actualizar la solicitud
+        $solicitud->update([
+            'estado'      => $nuevoEstado,
+            'revisado_por'=> $request->user()->id,
+            'revisado_at' => now(),
+        ]);
+
+        // Generar notificación push para el chofer
+        if ($solicitud->chofer_id) {
+            $esAprobado = $nuevoEstado === 'aprobado';
+
+            $titulo  = $esAprobado
+                ? '✅ Cambio de ruta aprobado'
+                : '❌ Cambio de ruta rechazado';
+
+            $mensaje = $esAprobado
+                ? "Tu solicitud para pasar a la ruta \"{$solicitud->ruta_solicitada}\" fue APROBADA."
+                    . ($nota ? " Nota: {$nota}" : '')
+                : "Tu solicitud para la ruta \"{$solicitud->ruta_solicitada}\" fue RECHAZADA."
+                    . ($nota ? " Motivo: {$nota}" : ' Contacta al administrador para más detalles.');
+
+            Notificacion::enviar(
+                userId:       $solicitud->chofer_id,
+                titulo:       $titulo,
+                mensaje:      $mensaje,
+                tipo:         $nuevoEstado === 'aprobado' ? 'ruta_aprobada' : 'ruta_rechazada',
+                referenciaId: $solicitud->id,
+            );
+        }
+
+        $etiqueta = $nuevoEstado === 'aprobado' ? 'aprobada' : 'rechazada';
+        return redirect()
+            ->route('admin.rutas.solicitudes')
+            ->with('success', "Solicitud {$etiqueta} correctamente. El chofer fue notificado.");
+    }
+}
