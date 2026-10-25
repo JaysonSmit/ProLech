@@ -1,7 +1,14 @@
 // APK de la app de acopio offline-first. Todo el código vive en :composeApp
 // (librería KMP); este módulo solo empaqueta el ícono, el manifiesto y la config de red.
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.androidApplication)
+}
+
+// Firma del release: keystore.properties (fuera de git). Sin él, el release sale sin firmar.
+val firma = Properties().apply {
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
 
 android {
@@ -25,9 +32,24 @@ android {
         }
     }
 
+    signingConfigs {
+        if (firma.getProperty("storeFile") != null) {
+            create("release") {
+                storeFile     = rootProject.file(firma.getProperty("storeFile"))
+                storePassword = firma.getProperty("storePassword")
+                keyAlias      = firma.getProperty("keyAlias")
+                keyPassword   = firma.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8: reduce y ofusca el código (APK más liviano y más difícil de copiar)
+            isMinifyEnabled   = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
