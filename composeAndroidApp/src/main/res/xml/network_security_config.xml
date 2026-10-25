@@ -1,14 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Desarrollo: el backend Laravel corre por HTTP en la red local y su IP cambia
-    según la red (192.168.0.x, 192.168.1.x, 10.0.2.2 en el emulador...). Antes solo se
-    permitía 192.168.1.5 y con cualquier otra IP Android bloqueaba la conexión.
-    PRODUCCIÓN: publicar la API con HTTPS y poner cleartextTrafficPermitted="false".
+    Por defecto (release): solo HTTPS. Los datos de acopio y el token de sesión nunca viajan en texto plano.
+    (La versión debug, en src/debug, permite HTTP para probar con el Laravel de la red local.)
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- Emulador de Android Studio apuntando al backend del propio PC -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
 </network-security-config>
