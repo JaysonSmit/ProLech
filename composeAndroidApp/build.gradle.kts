@@ -16,12 +16,14 @@ android {
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        // Distinto de :app:androidApp para poder instalar ambas en el mismo celular
-        applicationId = "com.example.prolechc.acopio"
+        // Identificador propio: OpenStreetMap bloquea los mosaicos a las apps "com.example.*"
+        // (el mapa salía "Access blocked") y Google Play tampoco las acepta.
+        // Distinto de :app:androidApp para poder instalar ambas en el mismo celular.
+        applicationId = "pe.prolech.acopio"
         minSdk        = libs.versions.android.minSdk.get().toInt()
         targetSdk     = libs.versions.android.targetSdk.get().toInt()
-        versionCode   = 2
-        versionName   = "2.0"
+        versionCode   = 3
+        versionName   = "2.1"
     }
 
     packaging {

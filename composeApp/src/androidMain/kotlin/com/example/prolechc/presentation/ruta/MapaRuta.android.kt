@@ -54,14 +54,17 @@ actual fun MapaRuta(
     val alTocar by rememberUpdatedState(onParadaClick)
 
     val mapa = remember {
-        // osmdroid exige un user-agent propio para descargar mosaicos de OpenStreetMap
+        // OpenStreetMap exige un user-agent que identifique a la app. Con MAPNIK osmdroid
+        // manda el nombre del paquete (por eso el APK usa "pe.prolech.acopio": OSM bloquea
+        // los "com.example.*"); este valor se usa con las demás fuentes de mosaicos.
         Configuration.getInstance().apply {
             load(context, context.getSharedPreferences("osmdroid", Context.MODE_PRIVATE))
-            userAgentValue = context.packageName
+            userAgentValue = agenteMapa(context)
             // Caché de mosaicos en la carpeta privada: sin permisos de almacenamiento y
-            // permite ver las zonas ya recorridas aunque no haya señal
+            // permite ver las zonas ya recorridas aunque no haya señal. Carpeta nueva para
+            // descartar los mosaicos de "bloqueado" que hayan quedado guardados.
             osmdroidBasePath = java.io.File(context.filesDir, "osmdroid")
-            osmdroidTileCache = java.io.File(context.cacheDir, "osmdroid-tiles")
+            osmdroidTileCache = java.io.File(context.cacheDir, "osmdroid-mosaicos")
         }
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
@@ -211,4 +214,12 @@ actual fun rememberSolicitarPermisoUbicacion(onResultado: (Boolean) -> Unit): ()
             launcher.launch(permisos.toTypedArray())
         }
     }
+}
+
+/** "ProLech-Acopio/2.0 (Android; acopio de leche Huata, Puno)" */
+internal fun agenteMapa(context: Context): String {
+    val version = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull() ?: "1"
+    return "ProLech-Acopio/$version (Android; acopio de leche Huata, Puno)"
 }

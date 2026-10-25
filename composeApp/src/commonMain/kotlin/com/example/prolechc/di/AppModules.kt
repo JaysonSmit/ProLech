@@ -69,7 +69,16 @@ import org.koin.dsl.module
 val networkModule = module {
     single {
         val tokenStorage = get<com.example.prolechc.data.local.TokenStorage>()
-        HttpClientFactory.create { kotlinx.coroutines.runBlocking { tokenStorage.getToken() } }
+        val estadoSesion = get<com.example.prolechc.data.local.EstadoSesion>()
+        val scope = get<CoroutineScope>(named(SCOPE_APP))
+        HttpClientFactory.create(
+            tokenProvider = { kotlinx.coroutines.runBlocking { tokenStorage.getToken() } },
+            // 401 en cualquier llamada: se olvida el token y la app pide el login (datos offline intactos)
+            alSesionVencida = {
+                estadoSesion.marcarVencida()
+                scope.launch { tokenStorage.clearToken() }
+            }
+        )
     }
     // Cliente SIN token para servicios de terceros (OSRM): nunca se filtran credenciales
     single(named(CLIENTE_EXTERNO)) {
