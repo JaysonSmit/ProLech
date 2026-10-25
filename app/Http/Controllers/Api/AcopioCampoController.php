@@ -63,6 +63,34 @@ class AcopioCampoController extends Controller
         return response()->json(['message' => 'Acopio eliminado.']);
     }
 
+    // POST /api/acopios-campo/{uuid}/foto  (multipart: foto)
+    // Evidencia del acopio: pantalla del Lactoscan, balde o leche rechazada.
+    public function foto(Request $request, string $uuid): JsonResponse
+    {
+        $request->validate([
+            'foto' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:6144'],
+        ], [
+            'foto.max' => 'La foto pesa más de 6 MB.',
+        ]);
+
+        $acopio = AcopioCampo::where('uuid', $uuid)
+                             ->where('chofer_id', $request->user()->id)
+                             ->first();
+
+        if (! $acopio) {
+            return response()->json(['message' => 'Acopio no encontrado.'], 404);
+        }
+
+        if ($acopio->foto_path) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($acopio->foto_path);
+        }
+        $acopio->update([
+            'foto_path' => $request->file('foto')->store('acopios-campo/fotos', 'public'),
+        ]);
+
+        return response()->json(['data' => $acopio->toApi()]);
+    }
+
     // ── Privados ───────────────────────────────────────────────────────────────
 
     private function validar(Request $request, bool $conUuid): array
@@ -75,6 +103,7 @@ class AcopioCampoController extends Controller
             'densidad'        => ['required', 'numeric', 'min:0', 'max:99'],
             'estado_calidad'  => ['required', 'in:APROBADO,OBSERVADO,RECHAZADO'],
             'actualizado_en'  => ['required', 'integer', 'min:0'],
+            'grasa'           => ['nullable', 'numeric', 'min:0', 'max:15'],
         ];
 
         if ($conUuid) {

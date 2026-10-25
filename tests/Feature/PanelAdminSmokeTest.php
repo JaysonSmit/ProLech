@@ -42,7 +42,8 @@ class PanelAdminSmokeTest extends TestCase
         $pedido = PedidoWeb::create(['codigo_pedido' => 'WEB-1001', 'numero_comprobante' => 'B001-00000001',
             'cliente_nombre' => 'Cliente', 'cliente_telefono' => '999', 'cliente_direccion' => 'Huata',
             'total' => 18, 'metodo_pago' => 'Efectivo', 'estado_pedido' => 'Pendiente']);
-        $this->ids = ['ganadero' => $g->id, 'producto' => $p->id, 'pedido' => $pedido->id, 'zona' => $zona->id];
+        $this->ids = ['ganadero' => $g->id, 'producto' => $p->id, 'pedido' => $pedido->id, 'zona' => $zona->id,
+            'chofer' => $chofer->id];
     }
 
     private function comoAdmin(): static

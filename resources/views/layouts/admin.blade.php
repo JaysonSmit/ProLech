@@ -762,10 +762,30 @@
 
         @if($webUser->isAdmin())
         <div class="nav-section" style="margin-top:8px">Logística</div>
+        <a href="{{ route('admin.operaciones.en-vivo') }}"
+           class="nav-link {{ request()->routeIs('admin.operaciones.en-vivo*') ? 'active' : '' }}">
+            <span class="nav-icon">📡</span>
+            <span>Panel en vivo</span>
+        </a>
         <a href="{{ route('admin.mapa') }}"
            class="nav-link {{ request()->routeIs('admin.mapa*') ? 'active' : '' }}">
             <span class="nav-icon">🗺️</span>
             <span>Mapa GPS</span>
+        </a>
+        <a href="{{ route('admin.operaciones.recorrido') }}"
+           class="nav-link {{ request()->routeIs('admin.operaciones.recorrido*') ? 'active' : '' }}">
+            <span class="nav-icon">🛰️</span>
+            <span>Recorridos y km</span>
+        </a>
+        <a href="{{ route('admin.operaciones.zonas') }}"
+           class="nav-link {{ request()->routeIs('admin.operaciones.zonas*') ? 'active' : '' }}">
+            <span class="nav-icon">🧭</span>
+            <span>Zonas en el mapa</span>
+        </a>
+        <a href="{{ route('admin.operaciones.exportar') }}"
+           class="nav-link {{ request()->routeIs('admin.operaciones.exportar*') ? 'active' : '' }}">
+            <span class="nav-icon">📤</span>
+            <span>Exportar</span>
         </a>
         <a href="{{ route('admin.rutas.solicitudes') }}"
            class="nav-link {{ request()->routeIs('admin.rutas*') ? 'active' : '' }}">

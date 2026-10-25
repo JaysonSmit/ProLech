@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('acopios-campo',           [AcopioCampoController::class, 'store']);
         Route::put('acopios-campo/{uuid}',     [AcopioCampoController::class, 'update']);
         Route::delete('acopios-campo/{uuid}',  [AcopioCampoController::class, 'destroy']);
+        Route::post('acopios-campo/{uuid}/foto', [AcopioCampoController::class, 'foto']);
     });
 
     // ── GPS Tracking (chofer + admin) ─────────────────────────────────────────

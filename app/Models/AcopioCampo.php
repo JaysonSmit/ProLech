@@ -18,6 +18,8 @@ class AcopioCampo extends Model
         'densidad',
         'estado_calidad',
         'actualizado_en',
+        'grasa',
+        'foto_path',
     ];
 
     protected $casts = [
@@ -25,6 +27,7 @@ class AcopioCampo extends Model
         'litros'          => 'float',
         'porcentaje_agua' => 'float',
         'densidad'        => 'float',
+        'grasa'           => 'float',
         'actualizado_en'  => 'integer',
     ];
 
@@ -49,6 +52,8 @@ class AcopioCampo extends Model
             'densidad'        => $this->densidad,
             'estado_calidad'  => $this->estado_calidad,
             'actualizado_en'  => $this->actualizado_en,
+            'grasa'           => $this->grasa,
+            'foto_url'        => $this->foto_path ? asset('storage/' . $this->foto_path) : null,
         ];
     }
 }

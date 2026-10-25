@@ -193,6 +193,21 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
     Route::get('mapa',             [MapaGpsController::class, 'index'])->name('mapa');
     Route::get('mapa/ubicaciones', [MapaGpsController::class, 'ubicaciones'])->name('mapa.ubicaciones');
 
+    // ── Operaciones: panel en vivo, recorridos, zonas en el mapa y exportación ──
+    Route::controller(\App\Http\Controllers\Web\OperacionesController::class)->group(function () {
+        Route::get('en-vivo',                              'enVivo')->name('operaciones.en-vivo');
+        Route::get('en-vivo/datos',                        'enVivoDatos')->name('operaciones.en-vivo.datos');
+        Route::get('operaciones/recorrido',                'recorrido')->name('operaciones.recorrido');
+        Route::get('operaciones/recorrido/{chofer}/datos', 'recorridoDatos')->name('operaciones.recorrido.datos');
+        Route::get('zonas/mapa',                           'zonasMapa')->name('operaciones.zonas');
+        Route::post('zonas/mapa/{ganadero}',               'zonasMapaGuardar')->name('operaciones.zonas.guardar');
+        Route::get('exportar',                             'exportar')->name('operaciones.exportar');
+        Route::get('exportar/acopios.csv',                 'exportarAcopiosCsv')->name('operaciones.exportar.acopios');
+        Route::get('exportar/acopios/imprimir',            'exportarAcopiosImprimir')->name('operaciones.exportar.acopios.imprimir');
+        Route::get('exportar/liquidaciones.csv',           'exportarLiquidacionesCsv')->name('operaciones.exportar.liquidaciones');
+        Route::get('exportar/rutas.csv',                   'exportarRutasCsv')->name('operaciones.exportar.rutas');
+    });
+
     Route::get('rutas/solicitudes', [RutasController::class, 'index'])->name('rutas.solicitudes');
     Route::post('rutas/solicitudes/{solicitud}/responder', [RutasController::class, 'responderSolicitud'])->name('rutas.responder');
 

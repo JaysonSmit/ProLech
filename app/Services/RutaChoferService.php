@@ -89,6 +89,8 @@ class RutaChoferService
             'rol_mes'       => $asignacion?->rol_mes ?? 'sin_asignar',
             'fecha'         => $hoy->toDateString(),
             'planta'        => $planta,
+            // Capacidad del camión (litros) para la barra de carga de la app
+            'capacidad_litros' => (float) Configuracion::get('capacidad_camion_litros', 1200),
             'total'         => $paradas->count(),
             'atendidos'     => $paradas->where('atendido', true)->count(),
             'paradas'       => $paradas->all(),
