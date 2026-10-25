@@ -1,0 +1,47 @@
+-- Tabla local de acopios de leche (Single Source of Truth de la app).
+-- El id es un UUID generado en el celular para poder crear registros sin red.
+CREATE TABLE AcopioEntity (
+    id             TEXT    NOT NULL PRIMARY KEY,
+    ganaderoId     INTEGER NOT NULL,
+    ganaderoNombre TEXT    NOT NULL,
+    litros         REAL    NOT NULL,
+    porcentajeAgua REAL    NOT NULL,
+    densidad       REAL    NOT NULL,
+    -- 'APROBADO' | 'OBSERVADO' | 'RECHAZADO'
+    estadoCalidad  TEXT    NOT NULL,
+    -- Timestamp en ms: resolución de conflictos Last-Write-Wins
+    actualizadoEn  INTEGER NOT NULL,
+    -- 'SINCRONIZADO' | 'PENDIENTE_CREAR' | 'PENDIENTE_ACTUALIZAR' | 'PENDIENTE_ELIMINAR'
+    estadoSync     TEXT    NOT NULL DEFAULT 'SINCRONIZADO'
+);
+
+selectAll:
+SELECT *
+FROM AcopioEntity
+WHERE estadoSync != 'PENDIENTE_ELIMINAR'
+ORDER BY actualizadoEn DESC;
+
+selectPendientes:
+SELECT *
+FROM AcopioEntity
+WHERE estadoSync != 'SINCRONIZADO';
+
+selectById:
+SELECT *
+FROM AcopioEntity
+WHERE id = ?;
+
+upsert:
+INSERT OR REPLACE INTO AcopioEntity VALUES ?;
+
+marcarSincronizado:
+UPDATE AcopioEntity SET estadoSync = 'SINCRONIZADO' WHERE id = ?;
+
+marcarPendienteEliminar:
+UPDATE AcopioEntity SET estadoSync = 'PENDIENTE_ELIMINAR', actualizadoEn = ? WHERE id = ?;
+
+deleteById:
+DELETE FROM AcopioEntity WHERE id = ?;
+
+deleteAll:
+DELETE FROM AcopioEntity;

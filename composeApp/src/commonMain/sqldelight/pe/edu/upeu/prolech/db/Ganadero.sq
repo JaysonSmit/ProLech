@@ -1,0 +1,20 @@
+-- Catálogo local de ganaderos de la ruta del chofer.
+-- Se descarga de /api/mi-ruta al sincronizar para poder registrar acopios sin red.
+CREATE TABLE GanaderoEntity (
+    id         INTEGER NOT NULL PRIMARY KEY,
+    nombre     TEXT    NOT NULL,
+    dni        TEXT    NOT NULL,
+    -- 1 = suspendido por faltas de calidad, 0 = activo
+    suspendido INTEGER NOT NULL DEFAULT 0
+);
+
+selectAllGanaderos:
+SELECT *
+FROM GanaderoEntity
+ORDER BY nombre;
+
+upsertGanadero:
+INSERT OR REPLACE INTO GanaderoEntity VALUES ?;
+
+deleteAllGanaderos:
+DELETE FROM GanaderoEntity;
