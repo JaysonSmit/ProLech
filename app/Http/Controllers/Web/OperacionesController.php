@@ -18,6 +18,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
+use App\Support\Xlsx;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -25,7 +28,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *  - Panel en vivo (litros por zona, choferes en ruta, alertas de calidad).
  *  - Repetición del recorrido de un chofer y km recorridos.
  *  - Asignar ganaderos a zonas y ubicarlos desde el mapa.
- *  - Exportar acopios, liquidaciones y rutas a Excel (CSV) o imprimir/PDF.
+ *  - Exportar acopios, liquidaciones y rutas a Excel (.xlsx / .csv) y PDF.
  */
 class OperacionesController extends Controller
 {
@@ -309,9 +312,11 @@ class OperacionesController extends Controller
         return $clasicos->concat($campo)->sortBy([['Fecha', 'asc'], ['Hora', 'asc']])->values();
     }
 
-    public function exportarAcopiosCsv(Request $request): StreamedResponse
+    public function exportarAcopiosCsv(Request $request): Response
     {
-        return $this->csv('acopios', $this->filasAcopios($request));
+        [$desde, $hasta] = $this->rango($request);
+        return $this->descargar($request, 'acopios', 'Acopios', $this->filasAcopios($request),
+            "Acopios del {$desde->format('d/m/Y')} al {$hasta->format('d/m/Y')}", ['Litros']);
     }
 
     public function exportarAcopiosImprimir(Request $request): View
@@ -324,7 +329,7 @@ class OperacionesController extends Controller
         ]);
     }
 
-    public function exportarLiquidacionesCsv(Request $request): StreamedResponse
+    public function exportarLiquidacionesCsv(Request $request): Response
     {
         [$desde, $hasta] = $this->rango($request);
         $filas = Liquidacion::with('ganadero:id,nombre,dni')
@@ -346,10 +351,12 @@ class OperacionesController extends Controller
                 'Estado'             => $l->estado ?? '',
             ]);
 
-        return $this->csv('liquidaciones', $filas);
+        return $this->descargar($request, 'liquidaciones', 'Liquidaciones', $filas,
+            "Planilla de liquidaciones del {$desde->format('d/m/Y')} al {$hasta->format('d/m/Y')}",
+            ['Litros aprobados', 'Total bruto S/', 'Descuentos S/', 'Total neto S/']);
     }
 
-    public function exportarRutasCsv(Request $request): StreamedResponse
+    public function exportarRutasCsv(Request $request): Response
     {
         $mes  = (int) $request->query('mes', now()->month);
         $anio = (int) $request->query('anio', now()->year);
@@ -368,7 +375,36 @@ class OperacionesController extends Controller
                 'Estado'     => $g->estado,
             ]);
 
-        return $this->csv("rutas_{$anio}_{$mes}", $filas);
+        return $this->descargar($request, "rutas_{$anio}_{$mes}", 'Hoja de ruta', $filas,
+            'Hoja de ruta — ' . Carbon::create($anio, $mes)->locale('es')->translatedFormat('F Y'), [], true);
+    }
+
+    /**
+     * Descarga en el formato pedido (?formato=csv|xlsx|pdf). El PDF agrega totales de las
+     * columnas indicadas y, en la hoja de ruta, agrupa por zona con casilla para marcar.
+     */
+    private function descargar(Request $request, string $nombre, string $hoja, Collection $filas,
+                               string $titulo, array $sumar = [], bool $porZona = false): Response
+    {
+        $archivo = "prolech_{$nombre}_" . now()->format('Ymd_His');
+
+        return match ($request->query('formato', 'csv')) {
+            'xlsx' => response(
+                Xlsx::generar($hoja, $filas->isEmpty() ? ['Sin datos en el rango seleccionado'] : array_keys($filas->first()), $filas),
+                200,
+                [
+                    'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Disposition' => "attachment; filename=\"{$archivo}.xlsx\"",
+                ]
+            ),
+            'pdf' => Pdf::loadView('admin.operaciones.tabla-pdf', [
+                'titulo'  => $titulo,
+                'filas'   => $filas,
+                'totales' => collect($sumar)->mapWithKeys(fn ($c) => [$c => $filas->sum($c)])->all(),
+                'grupos'  => $porZona ? $filas->groupBy('Zona') : null,
+            ])->setPaper('a4', 'landscape')->download("{$archivo}.pdf"),
+            default => $this->csv($nombre, $filas),
+        };
     }
 
     /**
