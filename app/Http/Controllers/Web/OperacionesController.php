@@ -207,7 +207,7 @@ class OperacionesController extends Controller
 
     public function zonasMapa(): View
     {
-        $zonas = Zona::where('activa', true)->orderBy('orden')->get(['id', 'nombre', 'codigo']);
+        $zonas = Zona::where('activa', true)->orderBy('orden')->get(['id', 'nombre', 'codigo', 'poligono', 'color']);
         $ganaderos = Ganadero::where('activo', true)->orderBy('nombre')
             ->get(['id', 'nombre', 'dni', 'direccion', 'zona_id', 'geo_lat', 'geo_lon', 'estado']);
 
@@ -232,6 +232,11 @@ class OperacionesController extends Controller
         if ($request->filled('geo_lat')) {
             $cambios['geo_lat'] = round((float) $validated['geo_lat'], 7);
             $cambios['geo_lon'] = round((float) $validated['geo_lon'], 7);
+            // Ubicado dentro del polígono de una zona y sin zona elegida a mano → se asigna esa zona
+            if (! $request->has('zona_id')) {
+                $zona = Zona::deUbicacion($cambios['geo_lat'], $cambios['geo_lon']);
+                if ($zona) $cambios['zona_id'] = $zona->id;
+            }
         }
         $ganadero->update($cambios);
 

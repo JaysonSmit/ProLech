@@ -130,18 +130,9 @@ class Acopio extends Model
     {
         $hoy = now()->startOfDay();
 
-        // Determinar el jueves de inicio de la semana actual
-        // Si hoy es jueves o después → la semana empezó el jueves pasado
-        // Si hoy es antes del jueves → la semana empezó el jueves de la semana anterior
-        $diaSemana = $hoy->dayOfWeek; // 0=domingo, 4=jueves, 3=miércoles
-
-        if ($diaSemana >= 4) {
-            // Jueves (4), Viernes (5), Sábado (6), Domingo (0→7) — estamos dentro de la semana
-            $inicioSemana = $hoy->copy()->startOfWeek(\Carbon\Carbon::THURSDAY);
-        } else {
-            // Lunes (1), Martes (2), Miércoles (3) — la semana empezó el jueves anterior
-            $inicioSemana = $hoy->copy()->subWeek()->startOfWeek(\Carbon\Carbon::THURSDAY);
-        }
+        // El jueves más reciente (hoy si es jueves). Antes, de domingo a miércoles se restaba
+        // una semana de más y la regla de 2 strikes contaba la semana equivocada.
+        $inicioSemana = $hoy->copy()->startOfWeek(\Carbon\Carbon::THURSDAY);
 
         $finSemana = $inicioSemana->copy()->addDays(6); // miércoles siguiente
 

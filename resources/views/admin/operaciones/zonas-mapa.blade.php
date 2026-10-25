@@ -12,6 +12,7 @@
     .g-item:hover { background: #f3f7ff; } .g-item.sel { background: #dbe9ff; }
     .punto { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 2px solid #fff; box-shadow: 0 0 0 1px #cbd5e1; }
     .leyenda span { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; font-size: .8rem; }
+    .etq-zona { background: transparent; border: 0; box-shadow: none; font-weight: 700; color: #0f2a4d; font-size: .85rem; }
     .aviso-mover { background: #fef3c7; color: #92400e; padding: 10px 12px; border-radius: 12px; font-size: .84rem; margin-bottom: 10px; display: none; }
     @media (max-width: 1000px) { .zm-grid { grid-template-columns: 1fr; } }
 </style>
@@ -33,7 +34,8 @@
             <div class="aviso-mover" id="aviso-mover">📍 Haz clic en el mapa donde está el predio de <b id="mover-nombre"></b> · <a href="#" id="cancelar-mover">Cancelar</a></div>
             <div id="mapa-zonas"></div>
             <p style="color:var(--text-muted); font-size:.8rem; margin-top:8px">
-                Toca un ganadero para cambiar su zona. Arrastra el marcador (o usa "Ubicar en el mapa") para corregir su GPS:
+                Toca un ganadero para cambiar su zona. Arrastra el marcador (o usa "Ubicar en el mapa" y haz clic) para corregir su GPS;
+                si cae dentro de una zona, se le asigna automáticamente.
                 la app del chofer usa estos datos para ordenar la ruta.
             </p>
         </div>
@@ -49,7 +51,7 @@
     const URL_BASE = @json(url('admin/zonas/mapa'));
     const CSRF = document.querySelector('meta[name=csrf-token]').content;
     const COLORES = ['#1f6feb', '#f2a541', '#8b5cf6', '#10b981', '#ef4444', '#0ea5e9', '#ec4899'];
-    const colorZona = id => { const i = ZONAS.findIndex(z => z.id === id); return i < 0 ? '#94a3b8' : COLORES[i % COLORES.length]; };
+    const colorZona = id => { const i = ZONAS.findIndex(z => z.id === id); return i < 0 ? '#94a3b8' : (ZONAS[i].color || COLORES[i % COLORES.length]); };
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
     document.getElementById('leyenda').innerHTML = ZONAS.map(z => `<span><i class="punto" style="background:${colorZona(z.id)}"></i>${esc(z.nombre)}</span>`).join('')
@@ -58,6 +60,10 @@
     const mapa = L.map('mapa-zonas').setView(PLANTA, 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(mapa);
     L.marker(PLANTA).addTo(mapa).bindTooltip('🏭 Planta');
+    // Polígono de cada zona: al ubicar un ganadero dentro, el servidor le asigna esa zona
+    ZONAS.filter(z => Array.isArray(z.poligono) && z.poligono.length > 2).forEach(z =>
+        L.polygon(z.poligono, { color: colorZona(z.id), weight: 2, fillOpacity: .08, interactive: false })
+            .addTo(mapa).bindTooltip(z.nombre, { permanent: true, direction: 'center', className: 'etq-zona' }));
     const marcadores = {};
     let moviendo = null;
 

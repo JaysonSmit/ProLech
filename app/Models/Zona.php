@@ -17,11 +17,41 @@ class Zona extends Model
         'descripcion',
         'orden',
         'activa',
+        'centro_lat',
+        'centro_lon',
+        'poligono',
+        'color',
     ];
 
     protected $casts = [
-        'activa' => 'boolean',
+        'activa'     => 'boolean',
+        'centro_lat' => 'float',
+        'centro_lon' => 'float',
+        'poligono'   => 'array',
     ];
+
+    /** ¿El punto cae dentro del polígono de la zona? (ray casting) */
+    public function contiene(float $lat, float $lon): bool
+    {
+        $vertices = $this->poligono ?? [];
+        $dentro = false;
+        for ($i = 0, $j = count($vertices) - 1; $i < count($vertices); $j = $i++) {
+            [$latI, $lonI] = $vertices[$i];
+            [$latJ, $lonJ] = $vertices[$j];
+            if ((($lonI > $lon) !== ($lonJ > $lon))
+                && ($lat < ($latJ - $latI) * ($lon - $lonI) / ($lonJ - $lonI) + $latI)) {
+                $dentro = ! $dentro;
+            }
+        }
+        return $dentro;
+    }
+
+    /** Zona activa cuyo polígono contiene el punto, o null. */
+    public static function deUbicacion(float $lat, float $lon): ?self
+    {
+        return static::where('activa', true)->whereNotNull('poligono')->orderBy('orden')->get()
+            ->first(fn (self $z) => $z->contiene($lat, $lon));
+    }
 
     public function ganaderos()
     {
