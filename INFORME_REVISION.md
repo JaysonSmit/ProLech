@@ -124,10 +124,48 @@ En el login, toca **"▸ Servidor"** y escribe la IP de la PC (hoy `192.168.0.10
 
 ---
 
-## 6. Límites conocidos (no verificados aquí)
+## 6. Segunda ronda: las 18 mejoras
 
-- **No probado en un celular físico ni emulador**: GPS real, mapa osmdroid y servicio en segundo plano.
-- **iOS** no se puede compilar en Windows (requiere Mac). Agregar a `Info.plist`: `NSLocationWhenInUseUsageDescription`.
+| # | Mejora | Qué se hizo | Estado |
+|---|---|---|---|
+| 1 | Servidor con HTTPS | `deploy/`: Docker (PHP-FPM 8.5 + MySQL 8.4) con **Caddy**, que saca y renueva el certificado Let's Encrypt solo; cabeceras HSTS/nosniff; `.env.production.example` y guía `DEPLOY.md`. El APK release solo acepta HTTPS. | ✅ listo; falta **tu** VPS y dominio |
+| 2 | Git | Repos de app y backend con historial; `.gitignore` excluye llaves, zips y logs | ✅ |
+| 3 | Prueba en emulador | Ver sección 6.1 | ✅ |
+| 4 | Registros rechazados | Un 4xx definitivo marca el acopio con **error** (tarjeta roja con el motivo) y deja de reintentarse para siempre | ✅ |
+| 5 | Sesión vencida | Un 401 al sincronizar lleva al login con aviso, **sin borrar** lo pendiente; no deja entrar a otro chofer con datos sin subir | ✅ |
+| 6 | OCR del Lactoscan | Botón 📷 lee grasa, densidad, agua y temperatura de la pantalla (ML Kit, sin internet) | ✅ |
+| 7 | Ticket | Ticket de 32 columnas: **PDF por WhatsApp** o **impresora Bluetooth** (ESC/POS) | ✅ |
+| 8 | Capacidad del camión | Barra de llenado (`capacidad_camion_litros`, 1200 L por defecto) y aviso al 90 % | ✅ |
+| 9 | Foto de evidencia | Foto del porongo/balde: se guarda offline y se sube al recuperar señal | ✅ |
+| 10 | Resumen de ruta | Al terminar: litros, entregas, km, tiempo, ganaderos faltantes | ✅ |
+| 11 | Panel en vivo | `/admin/en-vivo`: mapa con los camiones que se refresca cada 15 s | ✅ |
+| 12 | Repetir recorrido | `/admin/operaciones/recorrido`: reproduce el trazo del día y calcula los km | ✅ |
+| 13 | Zonas desde el mapa | `/admin/zonas/mapa`: arrastrar al ganadero para fijar su ubicación | ✅ |
+| 14 | Exportar | CSV para Excel (acopios, liquidaciones, rutas) y versión imprimible / PDF | ✅ |
+| 15 | Tienda | Seguimiento por código + celular, WhatsApp por cada estado, stock devuelto al cancelar, **boleta SUNAT vía Nubefact** | ✅ listo; falta **tu** cuenta Nubefact y Ultramsg |
+| 16 | CI | GitHub Actions: backend (PHPUnit + imágenes Docker) y app (pruebas + APK como artefacto) | ✅ corre al subir a GitHub |
+| 17 | Seguridad | Login: 5 intentos/min por correo (+30 por IP) en API y web. Las contraseñas demo ya no se publican fuera de `local` | ✅ |
+| 18 | APK release | Firmado (`firma/prolech-release.jks`, fuera de git) con **R8** (minify + shrinkResources) | ✅ |
+
+### 6.1 Prueba en emulador
+EMULADOR_RESULTADOS
+
+### 6.2 Bugs encontrados en esta ronda
+- **Las contraseñas demo se publicaban** en el HTML del login (cualquiera podía verlas con "ver código fuente") → solo en `local`.
+- **Cancelar un pedido no devolvía el stock**, y reactivarlo no lo verificaba → se corrigieron las dos cosas.
+- El "**total de litros**" sumaba todo el historial y no solo lo de hoy.
+- Un registro que el servidor rechaza (422) se **reintentaba para siempre** y bloqueaba la cola.
+- Tras cerrar sesión, el login **volvía a entrar solo** (se reutilizaba el ViewModel anterior).
+
+### 6.3 Llaves y respaldo
+`keystore.properties` y `firma/prolech-release.jks` **no están en git**. Guarda una copia en un lugar
+seguro (USB o nube privada). Si se pierden, no se pueden publicar actualizaciones con la misma firma.
+
+---
+
+## 7. Límites conocidos
+
+- **iOS** no se puede compilar en Windows (requiere Mac). Agregar a `Info.plist`: `NSLocationWhenInUseUsageDescription`, `NSCameraUsageDescription`. En iOS el OCR, el ticket y la impresora Bluetooth están como "no disponible".
 - El servidor público de **OSRM** es para uso moderado; en producción conviene uno propio.
-- La boleta es una representación interna; para validez tributaria se necesita un proveedor de facturación electrónica (SUNAT).
-- Producción: publicar la API con **HTTPS** y desactivar el HTTP en `network_security_config.xml`.
+- La boleta tiene validez SUNAT solo cuando se configuren `NUBEFACT_URL` y `NUBEFACT_TOKEN`; sin ellos queda como boleta interna.
+- El OCR depende de la nitidez de la foto: el chofer siempre revisa los valores antes de guardar.

@@ -55,6 +55,7 @@ import com.example.prolechc.domain.model.Acopio
 import com.example.prolechc.domain.model.EstadoCalidad
 import com.example.prolechc.domain.model.EstadoSync
 import com.example.prolechc.domain.model.GanaderoCampo
+import com.example.prolechc.presentation.colorCarga
 import com.example.prolechc.presentation.formato
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -210,13 +211,9 @@ private fun ResumenDia(state: AcopioUiState) {
             color = Color.White,
             style = MaterialTheme.typography.headlineMedium
         )
-        // Capacidad del camión: verde → caramelo (≥ 75 %) → rojo (≥ 90 %)
+        // Capacidad del camión: celeste → amarillo (≥ 85 %) → rojo (100 %)
         state.ocupacionCamion?.let { ocupacion ->
-            val color = when {
-                ocupacion >= 0.9  -> ProLechColores.Error
-                ocupacion >= 0.75 -> ProLechColores.Caramelo
-                else              -> ProLechColores.Celeste
-            }
+            val color = colorCarga(ocupacion)
             Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 LinearProgressIndicator(
                     progress = { ocupacion.toFloat().coerceIn(0f, 1f) },
@@ -225,7 +222,7 @@ private fun ResumenDia(state: AcopioUiState) {
                     trackColor = Color.White.copy(alpha = .15f)
                 )
                 Text(
-                    "  🚛 ${(ocupacion * 100).toInt()} % de ${formato(state.contexto.capacidadLitros, 0)} L",
+                    "  🚛 ${formato(state.litrosHoy, 0)} / ${formato(state.contexto.capacidadLitros, 0)} L",
                     color = Color.White, style = MaterialTheme.typography.labelMedium
                 )
             }

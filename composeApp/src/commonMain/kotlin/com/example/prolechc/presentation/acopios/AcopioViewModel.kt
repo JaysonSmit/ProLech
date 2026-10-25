@@ -20,7 +20,9 @@ import com.example.prolechc.domain.usecase.ObservarAcopiosUseCase
 import com.example.prolechc.domain.usecase.ObservarGanaderosUseCase
 import com.example.prolechc.domain.usecase.RegistrarAcopioUseCase
 import com.example.prolechc.domain.usecase.SincronizarAcopiosUseCase
+import com.example.prolechc.presentation.NivelCarga
 import com.example.prolechc.presentation.formato
+import com.example.prolechc.presentation.nivelCarga
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -100,7 +102,7 @@ class AcopioViewModel(
     private val mensaje = MutableStateFlow<String?>(null)
     private val formulario = MutableStateFlow(FormularioAcopio())
     private val leyendo = MutableStateFlow(false)
-    private var avisoCapacidadDado = false
+    private var nivelAvisado = NivelCarga.NORMAL
 
     /** La UI solo lee de SQLDelight (Single Source of Truth). */
     val uiState: StateFlow<AcopioUiState> = combine(
@@ -262,14 +264,18 @@ class AcopioViewModel(
         }
     }
 
-    /** Avisa una sola vez cuando el camión pasa el 90 % de su capacidad. */
+    /** Avisa una vez al pasar el 85 % y otra al llenarse el camión. */
     private fun avisoCapacidad(): String? {
         val estado = uiState.value
         val ocupacion = estado.ocupacionCamion ?: return null
-        if (ocupacion < 0.9 || avisoCapacidadDado) return null
-        avisoCapacidadDado = true
-        return "🚛 Camión al ${(ocupacion * 100).toInt()} %: quedan " +
-            "${formato((estado.contexto.capacidadLitros - estado.litrosHoy).coerceAtLeast(0.0), 0)} L de capacidad"
+        val nivel = nivelCarga(ocupacion)
+        if (nivel <= nivelAvisado) return null
+        nivelAvisado = nivel
+        return when (nivel) {
+            NivelCarga.LLENO -> "🚛 Camión LLENO (${formato(estado.litrosHoy, 0)} L): vuelve a la planta antes de recoger más"
+            else -> "🚛 Camión al ${(ocupacion * 100).toInt()} %: quedan " +
+                "${formato((estado.contexto.capacidadLitros - estado.litrosHoy).coerceAtLeast(0.0), 0)} L de capacidad"
+        }
     }
 
     // ── Ticket para el ganadero ──────────────────────────────────────────────

@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.prolechc.domain.model.Parada
 import com.example.prolechc.domain.ruta.Geo
 import com.example.prolechc.domain.ruta.coordenada
+import com.example.prolechc.presentation.colorCarga
 import com.example.prolechc.presentation.formato
 import com.example.prolechc.presentation.theme.ProLechColores
 import org.koin.compose.viewmodel.koinViewModel
@@ -238,11 +239,7 @@ private fun Encabezado(state: MiRutaUiState, onActualizar: () -> Unit) {
             LinearProgressIndicator(
                 progress = { carga.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(99.dp)),
-                color = when {
-                    carga >= 0.9f  -> ProLechColores.Error
-                    carga >= 0.75f -> ProLechColores.Caramelo
-                    else           -> ProLechColores.Celeste
-                },
+                color = colorCarga(carga.toDouble()),
                 trackColor = Color.White.copy(alpha = .15f)
             )
         }
