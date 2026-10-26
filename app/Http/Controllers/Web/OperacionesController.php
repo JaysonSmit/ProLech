@@ -211,7 +211,7 @@ class OperacionesController extends Controller
 
     public function zonasMapa(): View
     {
-        $zonas = Zona::where('activa', true)->orderBy('orden')->get(['id', 'nombre', 'codigo', 'poligono', 'color']);
+        $zonas = Zona::where('activa', true)->orderBy('orden')->get(['id', 'nombre', 'codigo', 'poligono', 'color', 'trazado', 'trazado_km']);
         $ganaderos = Ganadero::where('activo', true)->orderBy('nombre')
             ->get(['id', 'nombre', 'dni', 'direccion', 'zona_id', 'geo_lat', 'geo_lon', 'estado']);
 

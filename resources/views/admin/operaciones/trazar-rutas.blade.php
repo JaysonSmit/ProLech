@@ -335,7 +335,9 @@
         editando = null;
         document.getElementById('modal-titulo').textContent = 'Nueva ruta';
         document.getElementById('ruta-nombre').value = '';
-        document.getElementById('ruta-color').value = COLORES[ZONAS.length % COLORES.length];
+        // Primer color de la paleta que no use otra ruta (los parecidos confunden en el mapa)
+        const usados = ZONAS.map(z => colorZona(z).toLowerCase());
+        document.getElementById('ruta-color').value = [...COLORES, '#a16207', '#be185d', '#4d7c0f', '#7c2d12'].find(c => !usados.includes(c)) || '#0ea5e9';
         modal.style.display = 'flex';
         setTimeout(() => document.getElementById('ruta-nombre').focus(), 50);
     };
