@@ -50,6 +50,7 @@ class OperacionesController extends Controller
     private function acopiosDelDia(Carbon $dia): Collection
     {
         $clasicos = Acopio::with('ganadero:id,nombre,zona_id')
+            ->whereNull('acopio_campo_id')   // los de campo se suman abajo
             ->whereDate('fecha', $dia->toDateString())
             ->get()
             ->map(fn ($a) => [
@@ -275,6 +276,7 @@ class OperacionesController extends Controller
         $choferes = User::pluck('name', 'id');
 
         $clasicos = Acopio::with('ganadero:id,nombre,dni,zona_id')
+            ->whereNull('acopio_campo_id')   // los de campo se suman abajo
             ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
             ->get()
             ->map(fn ($a) => [

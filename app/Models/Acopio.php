@@ -34,6 +34,7 @@ class Acopio extends Model
         'observaciones',
         'foto_evidencia',
         'client_uuid',
+        'acopio_campo_id',
     ];
 
     protected $casts = [
@@ -52,6 +53,12 @@ class Acopio extends Model
     public function chofer()
     {
         return $this->belongsTo(User::class, 'chofer_id');
+    }
+
+    /** Registro de la app de campo del que viene este acopio (si viene de ahí). */
+    public function acopioCampo()
+    {
+        return $this->belongsTo(AcopioCampo::class);
     }
 
     // ── Reglas de negocio — Análisis de calidad ───────────────────────────────
