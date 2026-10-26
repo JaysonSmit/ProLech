@@ -94,8 +94,8 @@
                                 <div style="display:flex;gap:6px;flex-wrap:wrap">
                                     {{-- Rol principal y accesos adicionales --}}
                                     <button class="btn btn-ghost btn-sm"
-                                            onclick='abrirAccesos({{ $u->id }}, @json($u->name), @json($u->rol), @json($u->roles_extra ?? []))'>
-                                        🛡️ Accesos
+                                            onclick='abrirAccesos({{ $u->id }}, @json($u->name), @json($u->rol), @json($u->roles_extra ?? []), @json($u->email))'>
+                                        ✏️ Editar
                                     </button>
 
                                     {{-- Cambiar contraseña --}}
@@ -159,7 +159,8 @@
                 <h3 style="color:#fff">➕ Nuevo usuario</h3>
             </div>
             <div class="card-body" style="padding:18px">
-                <form method="POST" action="{{ route('admin.usuarios.store') }}">
+                {{-- autocomplete off: el navegador ponía el correo y la clave del admin conectado --}}
+                <form method="POST" action="{{ route('admin.usuarios.store') }}" autocomplete="off">
                     @csrf
 
                     <div class="form-group" style="margin-bottom:12px">
@@ -173,7 +174,7 @@
 
                     <div class="form-group" style="margin-bottom:12px">
                         <label>Email <span class="req">*</span></label>
-                        <input type="email" name="email" required
+                        <input type="email" name="email" required autocomplete="off"
                                value="{{ old('email') }}"
                                placeholder="carlos@prolech.com"
                                class="{{ $errors->has('email') ? 'invalid' : '' }}">
@@ -208,7 +209,7 @@
 
                     <div class="form-group" style="margin-bottom:12px">
                         <label>Contraseña <span class="req">*</span></label>
-                        <input type="password" name="password" required minlength="6"
+                        <input type="password" name="password" required minlength="6" autocomplete="new-password"
                                placeholder="Mínimo 6 caracteres"
                                class="{{ $errors->has('password') ? 'invalid' : '' }}">
                         @error('password')<span class="error-msg">{{ $message }}</span>@enderror
@@ -216,7 +217,7 @@
 
                     <div class="form-group" style="margin-bottom:18px">
                         <label>Confirmar contraseña <span class="req">*</span></label>
-                        <input type="password" name="password_confirmation" required minlength="6"
+                        <input type="password" name="password_confirmation" required minlength="6" autocomplete="new-password"
                                placeholder="Repetir contraseña">
                     </div>
 
@@ -230,13 +231,21 @@
         {{-- Editar accesos --}}
         <div class="card" id="panelAccesos" style="display:none">
             <div class="card-header" style="background:var(--purple);border-radius:var(--radius) var(--radius) 0 0">
-                <h3 style="color:#fff">🛡️ Accesos del usuario</h3>
+                <h3 style="color:#fff">✏️ Editar usuario</h3>
                 <button onclick="cerrarAccesos()" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.2rem">✕</button>
             </div>
             <div class="card-body" style="padding:18px">
                 <div id="acc-nombre" style="font-weight:700;margin-bottom:14px;color:var(--text)"></div>
-                <form method="POST" id="formAccesos" action="">
+                <form method="POST" id="formAccesos" action="" autocomplete="off">
                     @csrf
+                    <div class="form-group" style="margin-bottom:12px">
+                        <label>Nombre completo <span class="req">*</span></label>
+                        <input type="text" name="name" id="acc-name" required maxlength="150" autocomplete="off">
+                    </div>
+                    <div class="form-group" style="margin-bottom:12px">
+                        <label>Email <span class="req">*</span></label>
+                        <input type="email" name="email" id="acc-email" required autocomplete="off">
+                    </div>
                     <div class="form-group" style="margin-bottom:12px">
                         <label>Rol principal <span class="req">*</span></label>
                         <select name="rol" id="acc-rol" required>
@@ -256,7 +265,7 @@
                         </div>
                     </div>
                     <div style="display:flex;gap:10px">
-                        <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">💾 Guardar accesos</button>
+                        <button type="submit" class="btn btn-primary" style="flex:1;justify-content:center">💾 Guardar cambios</button>
                         <button type="button" class="btn btn-ghost" onclick="cerrarAccesos()">Cancelar</button>
                     </div>
                 </form>
@@ -299,7 +308,7 @@
             <div class="card-body" style="padding:14px 16px;font-size:.83rem;color:var(--text-muted);line-height:1.7">
                 <p>• Los <strong>choferes</strong> acceden solo desde la app Android.</p>
                 <p>• Los <strong>admin</strong> acceden al panel web con su email/contraseña.</p>
-                <p>• Un usuario puede tener <strong>varios accesos</strong>: su rol principal y otros adicionales (botón 🛡️ Accesos). Ve las secciones de todos ellos.</p>
+                <p>• Un usuario puede tener <strong>varios accesos</strong>: su rol principal y otros adicionales (botón ✏️ Editar). Ve las secciones de todos ellos.</p>
                 <p>• <strong>Desactivar</strong> bloquea el acceso sin borrar el historial.</p>
                 <p>• La contraseña inicial recomendada: <strong>prolech + año</strong>.</p>
             </div>
@@ -347,9 +356,11 @@
         sincronizarCasillas(g);
     });
 
-    window.abrirAccesos = function (id, nombre, rol, extras) {
+    window.abrirAccesos = function (id, nombre, rol, extras, email) {
         document.getElementById('formAccesos').action = BASE + '/' + id + '/accesos';
         document.getElementById('acc-nombre').textContent = 'Usuario: ' + nombre;
+        document.getElementById('acc-name').value = nombre;
+        document.getElementById('acc-email').value = email;
         document.getElementById('acc-rol').value = rol;
         document.querySelectorAll('#acc-extras input').forEach(function (c) { c.checked = extras.indexOf(c.value) >= 0; });
         sincronizarCasillas(document.getElementById('acc-extras'));

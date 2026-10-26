@@ -38,6 +38,14 @@ class AsignacionZona extends Model
         return $this->belongsTo(Zona::class);
     }
 
+    /** Nombre de la ruta del chofer en el mes actual: la zona, «Volante» o null si no tiene asignación. */
+    public static function rutaDelMes(int $choferId): ?string
+    {
+        $a = self::with('zona:id,nombre')->where('chofer_id', $choferId)
+            ->where('mes', now()->month)->where('anio', now()->year)->first();
+        return $a ? ($a->zona?->nombre ?? 'Volante') : null;
+    }
+
     /**
      * Asigna un chofer a una zona (o como volante si $zonaId es null) en un mes.
      * Cada zona tiene un solo titular por mes: si ya la ocupa otro chofer, intercambian

@@ -25,7 +25,8 @@ class RutasController extends Controller
         $solicitudes = SolicitudRuta::with(['chofer:id,name,email', 'revisor:id,name'])
             ->when($estado !== 'todas', fn ($q) => $q->where('estado', $estado))
             ->whereNotNull('chofer_id')        // Solo las de choferes (app móvil)
-            ->orderByRaw("FIELD(estado,'pendiente','aprobado','rechazado')")
+            // CASE en vez de FIELD(): FIELD solo existe en MySQL
+            ->orderByRaw("CASE estado WHEN 'pendiente' THEN 0 WHEN 'aprobado' THEN 1 ELSE 2 END")
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
@@ -36,7 +37,11 @@ class RutasController extends Controller
             'rechazado' => SolicitudRuta::whereNotNull('chofer_id')->where('estado', 'rechazado')->count(),
         ];
 
-        return view('admin.rutas_solicitudes', compact('solicitudes', 'contadores', 'estado'));
+        // Ruta que cada chofer tiene HOY (para las pendientes: la guardada pudo quedar desactualizada)
+        $rutasDelMes = AsignacionZona::with('zona:id,nombre')->where('mes', now()->month)->where('anio', now()->year)
+            ->get()->mapWithKeys(fn ($a) => [$a->chofer_id => $a->zona?->nombre ?? 'Volante']);
+
+        return view('admin.rutas_solicitudes', compact('solicitudes', 'contadores', 'estado', 'rutasDelMes'));
     }
 
     /**

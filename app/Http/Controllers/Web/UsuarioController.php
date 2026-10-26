@@ -50,21 +50,23 @@ class UsuarioController extends Controller
         ]);
 
         $usuario = User::create([
-            'name'        => $validated['name'],
-            'email'       => $validated['email'],
+            'name'        => self::nombrePropio($validated['name']),
+            'email'       => mb_strtolower(trim($validated['email'])),
             'rol'         => $validated['rol'],
             'roles_extra' => self::extras($validated['rol'], $validated['roles_extra'] ?? []),
             'password'    => Hash::make($validated['password']),
             'activo'      => true,
         ]);
 
-        return back()->with('success', "✅ Usuario \"{$validated['name']}\" creado con acceso de: " . self::describir($usuario) . '.');
+        return back()->with('success', "✅ Usuario \"{$usuario->name}\" creado con acceso de: " . self::describir($usuario) . '.');
     }
 
-    // POST /admin/usuarios/{usuario}/accesos — rol principal y accesos adicionales
+    // POST /admin/usuarios/{usuario}/accesos — nombre, correo, rol principal y accesos adicionales
     public function accesos(Request $request, User $usuario): RedirectResponse
     {
         $validated = $request->validate([
+            'name'          => ['sometimes', 'required', 'string', 'max:150'],
+            'email'         => ['sometimes', 'required', 'email', Rule::unique('users', 'email')->ignore($usuario->id)],
             'rol'           => ['required', Rule::in(self::rolesInternos())],
             'roles_extra'   => ['nullable', 'array'],
             'roles_extra.*' => [Rule::in(self::rolesInternos())],
@@ -76,9 +78,24 @@ class UsuarioController extends Controller
             return back()->with('error', 'No puedes quitarte tu propio acceso de administrador.');
         }
 
-        $usuario->update(['rol' => $validated['rol'], 'roles_extra' => $extras]);
+        $usuario->update(array_filter([
+            'name'  => isset($validated['name']) ? self::nombrePropio($validated['name']) : null,
+            'email' => isset($validated['email']) ? mb_strtolower(trim($validated['email'])) : null,
+        ]) + ['rol' => $validated['rol'], 'roles_extra' => $extras]);
 
-        return back()->with('success', "✅ Accesos de \"{$usuario->name}\": " . self::describir($usuario) . '.');
+        return back()->with('success', "✅ Usuario \"{$usuario->name}\" actualizado: " . self::describir($usuario) . '.');
+    }
+
+    /** «jhon fredy quilla  LARICO» → «Jhon Fredy Quilla Larico» (de, del, la, y… en minúscula). */
+    public static function nombrePropio(string $nombre): string
+    {
+        $palabras = explode(' ', mb_convert_case(preg_replace('/\s+/u', ' ', trim($nombre)), MB_CASE_TITLE, 'UTF-8'));
+        foreach ($palabras as $i => $p) {
+            if ($i > 0 && in_array(mb_strtolower($p), ['de', 'del', 'la', 'las', 'los', 'y', 'e'], true)) {
+                $palabras[$i] = mb_strtolower($p);
+            }
+        }
+        return implode(' ', $palabras);
     }
 
     /** Roles que se pueden asignar desde el panel (el de proveedor tiene su propio portal). */

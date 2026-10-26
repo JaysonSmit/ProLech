@@ -49,6 +49,17 @@ class MapaGpsController extends Controller
             'choforesJson'     => $todosConTracking->toJson(),   // todos para el mapa
             'totalChoferes'    => $totalChoferes,
             'sinSenial'        => $sinSenial,
+            // Camino trazado de cada ruta y su chofer del mes, para comparar con la posición real
+            'rutas'            => \App\Models\Zona::where('activa', true)->orderBy('orden')->get()
+                ->filter(fn ($z) => $z->tieneTrazado())
+                ->map(fn ($z) => [
+                    'nombre'  => $z->nombre,
+                    'color'   => $z->color ?: '#1f6feb',
+                    'km'      => $z->trazado_km,
+                    'trazado' => $z->trazado,
+                    'chofer'  => \App\Models\AsignacionZona::with('chofer:id,name')->where('zona_id', $z->id)
+                        ->where('mes', now()->month)->where('anio', now()->year)->first()?->chofer?->name,
+                ])->values(),
         ]);
     }
 

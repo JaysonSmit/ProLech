@@ -195,16 +195,16 @@ class ChoferAppController extends Controller
             ], 422);
         }
 
-        // Obtener la ruta actual del chofer desde su último acopio real
-        // (orden por fecha de acopio + hora de registro, no por updated_at del ganadero)
+        // Ruta actual: la asignada este mes en «Rutas y choferes»; si no tiene, la de su último acopio
         $ultimoAcopio = \App\Models\Acopio::where('chofer_id', $chofer->id)
                                           ->orderByDesc('fecha')
                                           ->orderByDesc('created_at')
                                           ->first(['ganadero_id']);
 
-        $rutaActual = $ultimoAcopio
-            ? \App\Models\Ganadero::where('id', $ultimoAcopio->ganadero_id)->value('ruta_asignada') ?? 'Sin asignar'
-            : 'Sin asignar';
+        $rutaActual = \App\Models\AsignacionZona::rutaDelMes($chofer->id)
+            ?? ($ultimoAcopio
+                ? \App\Models\Ganadero::where('id', $ultimoAcopio->ganadero_id)->value('ruta_asignada') ?? 'Sin asignar'
+                : 'Sin asignar');
 
         $solicitud = SolicitudRuta::create([
             'chofer_id'       => $chofer->id,

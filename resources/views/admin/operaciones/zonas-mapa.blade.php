@@ -35,7 +35,7 @@
             <div id="mapa-zonas"></div>
             <p style="color:var(--text-muted); font-size:.8rem; margin-top:8px">
                 Toca un ganadero para cambiar su zona. Arrastra el marcador (o usa "Ubicar en el mapa" y haz clic) para corregir su GPS;
-                si cae dentro de una zona, se le asigna automáticamente.
+                si cae dentro de una zona, se le asigna esa zona (los de rutas sin polígono, como las creadas en «Rutas y choferes», conservan su ruta).
                 la app del chofer usa estos datos para ordenar la ruta.
             </p>
         </div>

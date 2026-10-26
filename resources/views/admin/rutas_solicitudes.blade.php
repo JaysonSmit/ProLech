@@ -233,7 +233,7 @@
 
                         <td>
                             <div class="ruta-arrow">
-                                <span class="from">{{ $s->ruta_actual ?? 'Sin asignar' }}</span>
+                                <span class="from">{{ $s->estado === 'pendiente' ? ($rutasDelMes[$s->chofer_id] ?? $s->ruta_actual ?? 'Sin asignar') : ($s->ruta_actual ?? 'Sin asignar') }}</span>
                                 <span class="arrow">→</span>
                                 <span class="to">{{ $s->ruta_solicitada }}</span>
                             </div>

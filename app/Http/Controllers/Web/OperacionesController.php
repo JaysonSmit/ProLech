@@ -236,8 +236,10 @@ class OperacionesController extends Controller
         if ($request->filled('geo_lat')) {
             $cambios['geo_lat'] = round((float) $validated['geo_lat'], 7);
             $cambios['geo_lon'] = round((float) $validated['geo_lon'], 7);
-            // Ubicado dentro del polígono de una zona y sin zona elegida a mano → se asigna esa zona
-            if (! $request->has('zona_id')) {
+            // Se le asigna la zona cuyo polígono lo contiene, salvo que su ruta actual no tenga
+            // polígono (rutas creadas en «Rutas y choferes», como HUATA1): esa la eligió el admin a mano
+            $rutaManual = $ganadero->zona_id && empty(Zona::whereKey($ganadero->zona_id)->value('poligono'));
+            if (! $request->has('zona_id') && ! $rutaManual) {
                 $zona = Zona::deUbicacion($cambios['geo_lat'], $cambios['geo_lon']);
                 if ($zona) $cambios['zona_id'] = $zona->id;
             }
@@ -271,6 +273,18 @@ class OperacionesController extends Controller
             'anio'      => now()->year,
             'planta'    => app(RutaChoferService::class)->planta(),
         ]);
+    }
+
+    /** Notificación al chofer titular de la ruta este mes (queda en sus notificaciones). */
+    private function avisarChofer(Zona $zona, string $mensaje): void
+    {
+        $choferId = AsignacionZona::where('zona_id', $zona->id)
+            ->where('mes', now()->month)->where('anio', now()->year)->value('chofer_id');
+        if ($choferId) {
+            \App\Models\Notificacion::enviar(
+                userId: $choferId, titulo: '🔄 Cambió tu ruta', mensaje: $mensaje, tipo: 'ruta_cambiada', referenciaId: $zona->id,
+            );
+        }
     }
 
     /** zona_id → chofer titular del mes actual. */
@@ -357,6 +371,10 @@ class OperacionesController extends Controller
         }
 
         $n = count($validated['ganadero_ids']);
+        $nombres = Ganadero::whereIn('id', $validated['ganadero_ids'])->pluck('nombre')->implode(', ');
+        $this->avisarChofer($zona, $validated['accion'] === 'agregar'
+            ? "Se agregó a tu ruta {$zona->nombre}: {$nombres}."
+            : "Ya no visitas en {$zona->nombre}: {$nombres}.");
         return response()->json([
             'message'   => $validated['accion'] === 'agregar'
                 ? "{$n} proveedor(es) agregado(s) a {$zona->nombre}."
@@ -381,6 +399,7 @@ class OperacionesController extends Controller
             $intercambio = AsignacionZona::asignar((int) $validated['chofer_id'], $zona->id, $mes, $anio);
             $nombre = User::find($validated['chofer_id'])->name;
             $mensaje = "{$nombre} recorrerá {$zona->nombre} este mes." . ($intercambio ? " Intercambio: {$intercambio}." : '');
+            $this->avisarChofer($zona, "Desde hoy tu ruta es {$zona->nombre}. Abre «Mi ruta» para ver tus proveedores.");
         } else {
             AsignacionZona::where('zona_id', $zona->id)->where('mes', $mes)->where('anio', $anio)
                 ->update(['zona_id' => null, 'rol_mes' => 'volante']);
@@ -409,6 +428,9 @@ class OperacionesController extends Controller
             'trazado'    => $puntos ?: null,
             'trazado_km' => $puntos ? Zona::largoKm($puntos) : null,
         ]);
+        $this->avisarChofer($zona, $puntos
+            ? "La planta trazó el camino de {$zona->nombre} ({$zona->trazado_km} km). Míralo en «Mi ruta»."
+            : "La planta quitó el camino trazado de {$zona->nombre}.");
 
         return response()->json([
             'message'    => $puntos
