@@ -62,7 +62,7 @@ class Produccion extends Model
     public static function stockActualMoldes(): float
     {
         $producido = (float) static::sum('kg_queso_estimado');
-        $vendido   = (float) Venta::sum('cantidad_kg');
+        $vendido   = (float) Venta::vigentes()->sum('cantidad_kg');
         return max(0.0, round($producido - $vendido, 1));
     }
 

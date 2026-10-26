@@ -117,4 +117,34 @@ class VentaService
             return $venta->load('detalles');
         });
     }
+
+    /**
+     * Anula la venta y devuelve el stock: los productos publicados vuelven a su
+     * stock_disponible y el queso de planta vuelve solo (las anuladas no restan).
+     *
+     * @throws \RuntimeException  ya anulada / ya entregada
+     */
+    public function anular(Venta $venta, string $motivo, User $usuario): Venta
+    {
+        return DB::transaction(function () use ($venta, $motivo, $usuario) {
+            $venta = Venta::lockForUpdate()->with('detalles')->findOrFail($venta->id);
+            if ($venta->anulada) {
+                throw new \RuntimeException("La venta #{$venta->id} ya estaba anulada.");
+            }
+            if ($venta->estado_despacho === 'entregado') {
+                throw new \RuntimeException("La venta #{$venta->id} ya fue entregada al cliente: no se puede anular.");
+            }
+
+            foreach ($venta->detalles as $d) {
+                if ($d->producto_tienda_id) {
+                    ProductoTienda::whereKey($d->producto_tienda_id)->increment('stock_disponible', (int) $d->cantidad);
+                }
+            }
+
+            $venta->totalDesdeDetalles = true;   // el total original queda registrado
+            $venta->update(['anulada_at' => now(), 'anulada_por' => $usuario->id, 'motivo_anulacion' => $motivo]);
+
+            return $venta;
+        });
+    }
 }

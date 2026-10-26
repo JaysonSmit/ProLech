@@ -52,7 +52,7 @@ class AdminDashboardController extends Controller
                                           ->where('estado', 'observado')
                                           ->count(),
 
-            'ventas_mes'         => Venta::whereMonth('fecha_venta', $mes)
+            'ventas_mes'         => Venta::vigentes()->whereMonth('fecha_venta', $mes)
                                          ->whereYear('fecha_venta', $anio)
                                          ->sum('total'),
 
@@ -179,7 +179,7 @@ class AdminDashboardController extends Controller
         $destinoFiltro  = $request->query('destino');
         $despachoFiltro = $request->query('despacho');
 
-        $ventas = Venta::with(['registrador:id,name', 'detalles'])
+        $ventas = Venta::with(['registrador:id,name', 'anulador:id,name', 'detalles'])
                        ->when($destinoFiltro, fn ($q) => $q->where('destino', $destinoFiltro))
                        ->when($despachoFiltro, fn ($q) => $q->where('estado_despacho', $despachoFiltro))
                        ->orderByDesc('fecha_venta')
@@ -189,7 +189,7 @@ class AdminDashboardController extends Controller
         $mes  = now()->month;
         $anio = now()->year;
 
-        $resumenMes = Venta::whereMonth('fecha_venta', $mes)
+        $resumenMes = Venta::vigentes()->whereMonth('fecha_venta', $mes)
                            ->whereYear('fecha_venta', $anio)
                            ->selectRaw('tipo_cliente, SUM(total) as total_tipo, SUM(cantidad_kg) as kg_tipo, COUNT(*) as num_ventas')
                            ->groupBy('tipo_cliente')
@@ -197,14 +197,14 @@ class AdminDashboardController extends Controller
                            ->keyBy('tipo_cliente');
 
         // RF-DESP — Resumen de envíos por destino geográfico
-        $resumenDestino = Venta::selectRaw('destino, SUM(total) as total_monto, SUM(cantidad_kg) as total_kg, COUNT(*) as num_envios')
+        $resumenDestino = Venta::vigentes()->selectRaw('destino, SUM(total) as total_monto, SUM(cantidad_kg) as total_kg, COUNT(*) as num_envios')
                                ->groupBy('destino')
                                ->orderByDesc('total_kg')
                                ->get();
 
-        $despachosPendientes = Venta::where('estado_despacho', 'preparacion')->count();
-        $despachosEnCamino   = Venta::where('estado_despacho', 'en_camino')->count();
-        $despachosEntregados = Venta::where('estado_despacho', 'entregado')->count();
+        $despachosPendientes = Venta::vigentes()->where('estado_despacho', 'preparacion')->count();
+        $despachosEnCamino   = Venta::vigentes()->where('estado_despacho', 'en_camino')->count();
+        $despachosEntregados = Venta::vigentes()->where('estado_despacho', 'entregado')->count();
 
         $precios = [
             'mayorista' => Venta::precioParaTipo('mayorista'),
@@ -266,6 +266,47 @@ class AdminDashboardController extends Controller
                              . number_format($venta->total, 2) . " con destino {$venta->destino}.");
     }
 
+    /** Comprobante imprimible (nota de venta interna, no es un comprobante electrónico SUNAT). */
+    public function comprobanteVenta(Venta $venta): View
+    {
+        $venta->load(['detalles', 'registrador:id,name', 'anulador:id,name']);
+
+        return view('admin.ventas-comprobante', compact('venta'));
+    }
+
+    /** Anula la venta y devuelve el stock. Solo administrador y jefe de producción. */
+    public function anularVenta(Request $request, Venta $venta): RedirectResponse
+    {
+        abort_unless(in_array($request->user()->rol, ['admin', 'jefe_produccion'], true), 403,
+            'Solo el administrador o el jefe de producción pueden anular ventas.');
+
+        $validated = $request->validate([
+            'motivo_anulacion' => ['required', 'string', 'min:5', 'max:250'],
+        ], [
+            'motivo_anulacion.required' => 'Escribe el motivo de la anulación.',
+            'motivo_anulacion.min'      => 'El motivo debe tener al menos 5 caracteres.',
+        ]);
+
+        try {
+            $venta = app(\App\Services\VentaService::class)->anular($venta, $validated['motivo_anulacion'], $request->user());
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['anulacion' => $e->getMessage()]);
+        }
+
+        \App\Services\AuditoriaService::registrar(
+            user:            $request->user(),
+            entidadTipo:     'Venta',
+            entidadId:       $venta->id,
+            accion:          'anulacion',
+            motivo:          $validated['motivo_anulacion'],
+            campoModificado: 'anulada_at',
+            valorAnterior:   null,
+            valorNuevo:      $venta->anulada_at->toDateTimeString()
+        );
+
+        return back()->with('success', "🚫 Venta #{$venta->id} anulada. Se devolvió el stock de sus productos.");
+    }
+
     public function actualizarDespacho(Request $request, Venta $venta): RedirectResponse
     {
         $validated = $request->validate([
@@ -275,6 +316,10 @@ class AdminDashboardController extends Controller
             'notas_despacho'  => ['nullable', 'string', 'max:500'],
             'motivo_cambio'   => ['nullable', 'string', 'max:250'],
         ]);
+
+        if ($venta->anulada) {
+            return back()->withErrors(['despacho' => "La venta #{$venta->id} está anulada: no se puede despachar."]);
+        }
 
         $estadoAnterior = $venta->estado_despacho;
 

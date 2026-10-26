@@ -303,6 +303,12 @@
         </form>
     </div>
 
+    @if($errors->hasAny(['anulacion', 'motivo_anulacion', 'despacho']))
+        <div style="margin:12px 22px 0;padding:10px 14px;border-radius:8px;background:#fef2f2;border:1px solid #fca5a5;color:#b91c1c;font-size:.85rem;font-weight:600">
+            ⛔ {{ $errors->first('anulacion') ?: ($errors->first('motivo_anulacion') ?: $errors->first('despacho')) }}
+        </div>
+    @endif
+
     <div class="card-body" style="padding:0">
         @if($ventas->isEmpty())
             <div style="text-align:center;padding:40px 20px;color:var(--text-muted)">
@@ -328,7 +334,7 @@
                 <tbody>
                     @foreach($ventas as $venta)
                     @php $badge = $venta->estado_despacho_badge; @endphp
-                    <tr>
+                    <tr @if($venta->anulada) style="background:#fafafa;opacity:.7" @endif>
                         <td style="color:var(--text-muted);font-size:.8rem">{{ $venta->id }}</td>
                         <td style="white-space:nowrap">{{ $venta->fecha_venta->format('d/m/Y') }}</td>
                         <td>
@@ -345,6 +351,14 @@
                             </span>
                         </td>
                         <td>
+                            @if($venta->anulada)
+                            <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5">
+                                🚫 Anulada
+                            </span>
+                            <span style="display:block;font-size:.72rem;color:var(--text-muted);margin-top:2px;max-width:180px" title="{{ $venta->motivo_anulacion }}">
+                                {{ $venta->anulada_at->format('d/m/Y') }} · {{ $venta->anulador?->name }}<br>{{ \Illuminate\Support\Str::limit($venta->motivo_anulacion, 40) }}
+                            </span>
+                            @else
                             <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:700;background:{{ $badge['bg'] }};color:{{ $badge['color'] }};border:1px solid {{ $badge['border'] }}">
                                 {{ $badge['icon'] }} {{ $badge['label'] }}
                             </span>
@@ -352,6 +366,7 @@
                                 <span style="display:block;font-size:.72rem;color:var(--text-muted);margin-top:2px">
                                     {{ $venta->fecha_despacho->format('d/m/Y') }}
                                 </span>
+                            @endif
                             @endif
                         </td>
                         <td style="font-size:.82rem">
@@ -378,8 +393,13 @@
                                     <span style="color:var(--text-muted)">× S/ {{ number_format($venta->precio_unitario, 2) }}</span></div>
                             @endforelse
                         </td>
-                        <td><strong style="color:var(--green)">S/ {{ number_format($venta->total, 2) }}</strong></td>
-                        <td>
+                        <td><strong style="color:{{ $venta->anulada ? 'var(--text-muted)' : 'var(--green)' }};{{ $venta->anulada ? 'text-decoration:line-through' : '' }}">S/ {{ number_format($venta->total, 2) }}</strong></td>
+                        <td style="white-space:nowrap">
+                            <a href="{{ route('admin.ventas.comprobante', $venta) }}" target="_blank" class="btn btn-sm"
+                               style="background:#f8fafc;color:var(--text);border:1px solid var(--border);font-size:.75rem;padding:4px 8px">
+                                🧾 Comprobante
+                            </a>
+                            @unless($venta->anulada)
                             <button type="button" class="btn btn-sm btn-despacho"
                                     style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:.75rem;padding:4px 8px;cursor:pointer"
                                     data-id="{{ $venta->id }}"
@@ -392,6 +412,16 @@
                                     onclick="abrirModalDespachoDesdeBtn(this)">
                                 🚚 Despacho
                             </button>
+                            @if(in_array(auth()->user()->rol, ['admin', 'jefe_produccion'], true) && $venta->estado_despacho !== 'entregado')
+                            <button type="button" class="btn btn-sm"
+                                    style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-size:.75rem;padding:4px 8px;cursor:pointer"
+                                    data-id="{{ $venta->id }}" data-cliente="{{ $venta->cliente }}"
+                                    data-total="{{ number_format($venta->total, 2) }}"
+                                    onclick="abrirModalAnular(this)">
+                                🚫 Anular
+                            </button>
+                            @endif
+                            @endunless
                         </td>
                     </tr>
                     @endforeach
@@ -447,6 +477,30 @@
             <div style="display:flex;justify-content:flex-end;gap:10px">
                 <button type="button" onclick="cerrarModalDespacho()" class="btn btn-sm" style="background:var(--border);color:var(--text)">Cancelar</button>
                 <button type="submit" class="btn btn-sm btn-success">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- ── Modal para Anular una venta ───────────────────────────────────────────── --}}
+<div id="modalAnular" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--bg-card);border-radius:12px;width:95%;max-width:460px;box-shadow:0 20px 25px -5px rgba(0,0,0,.3);overflow:hidden;border:1px solid var(--border)">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:#fef2f2">
+            <h4 style="margin:0;font-size:1rem;font-weight:700;color:#b91c1c" id="anularTitulo">🚫 Anular venta</h4>
+            <button type="button" onclick="cerrarModalAnular()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text-muted)">&times;</button>
+        </div>
+        <form method="POST" id="formAnular" action="" style="padding:20px">
+            @csrf
+            <p style="margin:0 0 14px;font-size:.85rem;color:var(--text-2)">
+                El stock de los productos vuelve al inventario y la venta deja de contar en los totales y reportes.
+                El registro se conserva marcado como <strong>anulado</strong>. Esta acción no se puede deshacer.
+            </p>
+            <label style="display:block;font-size:.8rem;font-weight:600;margin-bottom:4px">Motivo de la anulación *</label>
+            <input type="text" id="motivo_anulacion" name="motivo_anulacion" required minlength="5" maxlength="250"
+                   placeholder="Ej: El cliente canceló el pedido" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid var(--border);font-size:.9rem">
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
+                <button type="button" onclick="cerrarModalAnular()" class="btn btn-sm" style="background:var(--border);color:var(--text)">Volver</button>
+                <button type="submit" class="btn btn-sm" style="background:#dc2626;color:#fff">Anular venta</button>
             </div>
         </form>
     </div>
@@ -562,6 +616,19 @@ function abrirModalDespachoDesdeBtn(btn) {
     document.getElementById('modal_notas_despacho').value = d.notas || '';
     document.getElementById('modal_motivo_cambio').value = '';
     modal.style.display = 'flex';
+}
+
+function abrirModalAnular(btn) {
+    var d = btn.dataset;
+    document.getElementById('anularTitulo').textContent = '🚫 Anular venta #' + d.id + ' — ' + d.cliente + ' (S/ ' + d.total + ')';
+    document.getElementById('formAnular').action = '/admin/ventas/' + d.id + '/anular';
+    document.getElementById('motivo_anulacion').value = '';
+    document.getElementById('modalAnular').style.display = 'flex';
+    document.getElementById('motivo_anulacion').focus();
+}
+
+function cerrarModalAnular() {
+    document.getElementById('modalAnular').style.display = 'none';
 }
 
 function cerrarModalDespacho() {
