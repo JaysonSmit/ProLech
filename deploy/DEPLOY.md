@@ -38,9 +38,32 @@ git pull && cd deploy && docker compose --env-file ../.env up -d --build
 ```
 
 ## Copias de seguridad
+Se hacen **solas todos los días a las 02:00** (hora de Lima) en `storage/app/respaldos/prolech-AAAA-MM-DD_HHMMSS.sql.gz`.
+Se guardan los últimos 14 (`RESPALDO_CONSERVAR`). Si una falla, los administradores reciben un aviso en el panel.
+
 ```bash
-docker compose exec db sh -c 'mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' > respaldo-$(date +%F).sql
+docker compose exec app php artisan prolech:respaldo          # respaldo ahora mismo
+docker compose exec app ls -lh storage/app/respaldos          # ver los respaldos
+docker compose cp app:/var/www/html/storage/app/respaldos ./respaldos   # bajarlos al VPS
 ```
+Los respaldos viven en el mismo servidor: **copia uno a otro lugar cada semana** (tu PC, Google Drive),
+porque si se pierde el VPS se pierden con él.
+
+Restaurar uno (reemplaza los datos actuales):
+```bash
+gunzip -c respaldos/prolech-2026-10-26_020000.sql.gz | docker compose exec -T db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
+```
+
+## Tareas programadas
+`php artisan schedule:list` muestra todas. En Docker las arranca el contenedor `app`; sin Docker, el cron de `instalar-vps.sh`.
+
+| Hora | Tarea |
+|---|---|
+| 02:00 | Respaldo de la base de datos |
+| 03:00 | Borra códigos 2FA vencidos y notificaciones leídas de más de 90 días |
+| 03:10 | Borra tokens de la API vencidos |
+| 03:20 | Borra trabajos fallidos de la cola de más de 30 días |
+| 06:30 | Aviso al admin y al jefe de producción de insumos en stock mínimo |
 
 ## Opción B — Nginx sin Docker
 ```bash

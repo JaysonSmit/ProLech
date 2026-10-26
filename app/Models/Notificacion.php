@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 
 class Notificacion extends Model
 {
+    use MassPrunable;
+
     protected $table = 'notificaciones';
 
     protected $fillable = [
@@ -20,6 +23,12 @@ class Notificacion extends Model
     protected $casts = [
         'leida' => 'boolean',
     ];
+
+    /** Limpieza diaria (model:prune): las ya leídas de hace más de 90 días. Las no leídas se quedan. */
+    public function prunable()
+    {
+        return static::where('leida', true)->where('created_at', '<', now()->subDays(90));
+    }
 
     // ── Relaciones ─────────────────────────────────────────────────────────────
 
