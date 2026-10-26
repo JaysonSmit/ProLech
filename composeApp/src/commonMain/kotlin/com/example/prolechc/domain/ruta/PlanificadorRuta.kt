@@ -77,6 +77,23 @@ class PlanificadorRuta(
         )
     }
 
+    /**
+     * Plan con el camino que trazó el administrador: se respeta el orden de visita que
+     * calculó el servidor a lo largo del trazo y se dibuja ese trazo (funciona sin señal).
+     */
+    fun planTrazado(trazado: List<Coordenada>, paradas: List<Parada>): PlanRuta {
+        val orden = pendientes(paradas).sortedBy { it.orden }
+        val km = Geo.distanciaTotalKm(trazado)
+        return PlanRuta(
+            orden            = orden,
+            trazo            = trazado,
+            distanciaKm      = km,
+            duracionMin      = duracionMin(km, orden.size),
+            porCarretera     = true,
+            trazadoPorPlanta = true
+        )
+    }
+
     fun puntosDelRecorrido(desde: Coordenada?, orden: List<Parada>, regresoA: Coordenada?): List<Coordenada> =
         listOfNotNull(desde) + orden.mapNotNull { it.coordenada } + listOfNotNull(regresoA)
 

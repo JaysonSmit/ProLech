@@ -18,7 +18,9 @@ data class MiRutaResponseDto(
     @SerialName("paradas")           val paradas: List<ParadaDto>?  = null,
     @SerialName("planta")            val planta: PlantaDto?         = null,
     @SerialName("origen_ruta")       val origenRuta: String?        = null,
-    @SerialName("rol_mes")           val rolMes: String?            = null
+    @SerialName("rol_mes")           val rolMes: String?            = null,
+    /** Camino trazado por el administrador en el panel: [[lat, lon], ...] */
+    @SerialName("trazado")           val trazado: List<List<Double>>? = null
 )
 
 @Serializable

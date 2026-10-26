@@ -14,7 +14,9 @@ data class Ruta(
     /** "zona" (rotación mensual), "manual", "historial" o "" si el backend es antiguo. */
     val origenRuta: String = "",
     /** "titular", "volante" o "sin_asignar" en la rotación del mes. */
-    val rolMes: String = ""
+    val rolMes: String = "",
+    /** Camino que el administrador trazó en el panel; vacío = la app calcula uno. */
+    val trazado: List<Coordenada> = emptyList()
 )
 
 data class Parada(

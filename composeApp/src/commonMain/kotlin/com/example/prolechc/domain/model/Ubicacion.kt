@@ -20,5 +20,7 @@ data class PlanRuta(
     val distanciaKm: Double,
     val duracionMin: Int,
     /** true = trazo real por carretera (OSRM); false = líneas rectas sin señal. */
-    val porCarretera: Boolean
+    val porCarretera: Boolean,
+    /** true = es el camino que trazó el administrador en el panel. */
+    val trazadoPorPlanta: Boolean = false
 )

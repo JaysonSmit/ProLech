@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.prolechc.domain.model.Parada
+import com.example.prolechc.domain.model.PlanRuta
 import com.example.prolechc.domain.ruta.Geo
 import com.example.prolechc.domain.ruta.coordenada
 import com.example.prolechc.presentation.colorCarga
@@ -113,7 +114,7 @@ fun MiRutaScreen(
                         centrarEn     = centrar,
                         onParadaClick = onRegistrarAcopio
                     )
-                    Leyenda(Modifier.align(Alignment.BottomStart).padding(10.dp), state.plan?.porCarretera == true)
+                    Leyenda(Modifier.align(Alignment.BottomStart).padding(10.dp), state.plan)
                     SmallFloatingActionButton(
                         onClick = { centrar++ },
                         modifier = Modifier.align(Alignment.TopEnd).padding(10.dp),
@@ -269,14 +270,18 @@ private fun Insignia(texto: String, color: Color) {
 }
 
 @Composable
-private fun Leyenda(modifier: Modifier, porCarretera: Boolean) {
+private fun Leyenda(modifier: Modifier, plan: PlanRuta?) {
     Row(
         modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = .94f))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Linea(ProLechColores.Azul, if (porCarretera) "Camino sugerido" else "Plan (línea recta)")
+        Linea(ProLechColores.Azul, when {
+            plan?.trazadoPorPlanta == true -> "Ruta de la planta"
+            plan?.porCarretera == true     -> "Camino sugerido"
+            else                           -> "Plan (línea recta)"
+        })
         Linea(ProLechColores.Caramelo, "Recorrido")
     }
 }

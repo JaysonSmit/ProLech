@@ -249,6 +249,11 @@ class MiRutaViewModel(
         // Cancela el cálculo anterior: una respuesta vieja de OSRM no debe pisar el plan nuevo
         trabajoPlan?.cancel()
         trabajoPlan = viewModelScope.launch {
+            // Ruta trazada por el administrador: manda sobre el cálculo automático
+            if (ruta.trazado.size >= 2) {
+                plan.value = planificador.planTrazado(ruta.trazado, ruta.paradas)
+                return@launch
+            }
             val desde = rastreo.ultimaLectura.value?.coordenada ?: ruta.planta
             val enRecta = planificador.planEnLineaRecta(desde, ruta.paradas, ruta.planta)
             plan.value = enRecta

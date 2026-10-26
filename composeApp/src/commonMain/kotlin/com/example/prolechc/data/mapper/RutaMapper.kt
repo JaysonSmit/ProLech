@@ -50,6 +50,7 @@ fun MiRutaResponseDto.toDomain(): Ruta {
         paradas         = paradasFinales,
         planta          = planta?.let { Coordenada(it.lat, it.lon) },
         origenRuta      = origenRuta.orEmpty(),
-        rolMes          = rolMes.orEmpty()
+        rolMes          = rolMes.orEmpty(),
+        trazado         = trazado.orEmpty().filter { it.size >= 2 }.map { Coordenada(it[0], it[1]) }
     )
 }
