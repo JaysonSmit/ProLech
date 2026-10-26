@@ -251,6 +251,74 @@ class OperacionesController extends Controller
     }
 
     // ══════════════════════════════════════════════════════════════════════
+    // 13b. TRAZAR RUTAS: el administrador dibuja el camino de cada zona
+    // ══════════════════════════════════════════════════════════════════════
+
+    public function trazarRutas(): View
+    {
+        $zonas = Zona::where('activa', true)->orderBy('orden')
+            ->get(['id', 'nombre', 'codigo', 'poligono', 'color', 'trazado', 'trazado_km']);
+        $ganaderos = Ganadero::where('activo', true)->whereNotNull('zona_id')->orderBy('nombre')
+            ->get(['id', 'nombre', 'zona_id', 'geo_lat', 'geo_lon', 'estado']);
+
+        return view('admin.operaciones.trazar-rutas', [
+            'zonas'     => $zonas,
+            'ganaderos' => $ganaderos,
+            'paradas'   => $zonas->mapWithKeys(fn (Zona $z) => [$z->id => $this->paradasDeZona($z)]),
+            'planta'    => app(RutaChoferService::class)->planta(),
+        ]);
+    }
+
+    /** POST /admin/rutas/trazar/{zona}: guarda (o borra, con trazado vacío) el camino de la zona. */
+    public function trazarRutasGuardar(Request $request, Zona $zona): JsonResponse
+    {
+        $validated = $request->validate([
+            'trazado'     => ['present', 'array', 'max:5000'],
+            'trazado.*'   => ['array', 'size:2'],
+            'trazado.*.0' => ['numeric', 'between:-90,90'],
+            'trazado.*.1' => ['numeric', 'between:-180,180'],
+        ]);
+
+        $puntos = array_map(fn ($p) => [round((float) $p[0], 6), round((float) $p[1], 6)], $validated['trazado']);
+        if (count($puntos) === 1) {
+            return response()->json(['message' => 'El trazado necesita al menos dos puntos.'], 422);
+        }
+
+        $zona->update([
+            'trazado'    => $puntos ?: null,
+            'trazado_km' => $puntos ? Zona::largoKm($puntos) : null,
+        ]);
+
+        return response()->json([
+            'message'    => $puntos
+                ? "Ruta de {$zona->nombre} guardada ({$zona->trazado_km} km). La app del chofer la usará al actualizar su ruta."
+                : "Se borró el trazado de {$zona->nombre}: la app volverá a sugerir el camino automáticamente.",
+            'trazado_km' => $zona->trazado_km,
+            'paradas'    => $this->paradasDeZona($zona->fresh()),
+        ]);
+    }
+
+    /** Ganaderos de la zona en el orden en que el chofer los visitará, con su distancia al trazado. */
+    private function paradasDeZona(Zona $zona): array
+    {
+        $ganaderos = Ganadero::where('activo', true)->where('zona_id', $zona->id)
+            ->get(['id', 'nombre', 'geo_lat', 'geo_lon', 'estado']);
+        $ordenados = $zona->tieneTrazado() ? RutaChoferService::ordenarPorTrazado($ganaderos, $zona) : $ganaderos->sortBy('nombre');
+
+        return $ordenados->values()->map(function (Ganadero $g, int $i) use ($zona) {
+            $pos = $g->geo_lat !== null ? $zona->posicionEnTrazado((float) $g->geo_lat, (float) $g->geo_lon) : null;
+            return [
+                'id'      => $g->id,
+                'orden'   => $i + 1,
+                'nombre'  => $g->nombre,
+                'sin_gps' => $g->geo_lat === null,
+                'km'      => $pos[0] ?? null,
+                'lejos_m' => $pos[1] ?? null,
+            ];
+        })->all();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // 14. EXPORTAR
     // ══════════════════════════════════════════════════════════════════════
 

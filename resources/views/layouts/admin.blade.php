@@ -782,6 +782,11 @@
             <span class="nav-icon">🧭</span>
             <span>Zonas en el mapa</span>
         </a>
+        <a href="{{ route('admin.operaciones.trazar') }}"
+           class="nav-link {{ request()->routeIs('admin.operaciones.trazar*') ? 'active' : '' }}">
+            <span class="nav-icon">✏️</span>
+            <span>Trazar rutas</span>
+        </a>
         <a href="{{ route('admin.operaciones.exportar') }}"
            class="nav-link {{ request()->routeIs('admin.operaciones.exportar*') ? 'active' : '' }}">
             <span class="nav-icon">📤</span>

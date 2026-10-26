@@ -8,6 +8,7 @@ use App\Models\Zona;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
@@ -117,24 +118,47 @@ class RotacionController extends Controller
             $validated['zona_id'] = null;
         }
 
-        // Actualizar o crear
-        AsignacionZona::updateOrCreate(
-            ['chofer_id' => $validated['chofer_id'], 'mes' => $mes, 'anio' => $anio],
-            [
-                'zona_id'      => $validated['zona_id'],
-                'rol_mes'      => $validated['rol_mes'],
-                'fecha_inicio' => \Carbon\Carbon::createFromDate($anio, $mes, 1)->toDateString(),
-                'fecha_fin'    => \Carbon\Carbon::createFromDate($anio, $mes, 1)->endOfMonth()->toDateString(),
-                'notas'        => $validated['notas'],
-            ]
-        );
+        // Cada zona tiene un solo titular por mes: si ya la ocupa otro chofer, intercambian
+        // (el otro pasa a la zona que tenía este chofer, o queda como volante)
+        $intercambio = DB::transaction(function () use ($validated, $mes, $anio) {
+            $anterior = AsignacionZona::where('chofer_id', $validated['chofer_id'])
+                ->where('mes', $mes)->where('anio', $anio)->lockForUpdate()->first();
+            $ocupante = $validated['zona_id']
+                ? AsignacionZona::where('zona_id', $validated['zona_id'])->where('mes', $mes)->where('anio', $anio)
+                    ->where('chofer_id', '!=', $validated['chofer_id'])->lockForUpdate()->first()
+                : null;
+
+            $ocupante?->update(['zona_id' => null]);   // libera la zona antes de reasignarla
+
+            AsignacionZona::updateOrCreate(
+                ['chofer_id' => $validated['chofer_id'], 'mes' => $mes, 'anio' => $anio],
+                [
+                    'zona_id'      => $validated['zona_id'],
+                    'rol_mes'      => $validated['rol_mes'],
+                    'fecha_inicio' => \Carbon\Carbon::createFromDate($anio, $mes, 1)->toDateString(),
+                    'fecha_fin'    => \Carbon\Carbon::createFromDate($anio, $mes, 1)->endOfMonth()->toDateString(),
+                    'notas'        => $validated['notas'] ?? null,
+                ]
+            );
+
+            if (! $ocupante) {
+                return null;
+            }
+            $zonaPrevia = $anterior?->zona_id;
+            $ocupante->update([
+                'zona_id' => $zonaPrevia,
+                'rol_mes' => $zonaPrevia ? 'titular' : 'volante',
+            ]);
+            return $ocupante->chofer?->name . ' pasa a ' . ($zonaPrevia ? Zona::find($zonaPrevia)?->nombre : 'volante');
+        });
 
         $chofer = User::find($validated['chofer_id']);
         $zona   = $validated['zona_id'] ? Zona::find($validated['zona_id'])?->nombre : 'Volante';
+        $extra  = $intercambio ? " Intercambio: {$intercambio}." : '';
 
         return redirect()
             ->route('admin.rotacion.index', compact('mes', 'anio'))
-            ->with('success', "✅ {$chofer->name} asignado a {$zona} para {$mes}/{$anio}.");
+            ->with('success', "✅ {$chofer->name} asignado a {$zona} para {$mes}/{$anio}.{$extra}");
     }
 
     /**

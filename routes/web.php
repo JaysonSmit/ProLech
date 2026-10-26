@@ -203,6 +203,8 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
         Route::get('operaciones/recorrido/{chofer}/datos', 'recorridoDatos')->name('operaciones.recorrido.datos');
         Route::get('zonas/mapa',                           'zonasMapa')->name('operaciones.zonas');
         Route::post('zonas/mapa/{ganadero}',               'zonasMapaGuardar')->name('operaciones.zonas.guardar');
+        Route::get('rutas/trazar',                         'trazarRutas')->name('operaciones.trazar');
+        Route::post('rutas/trazar/{zona}',                 'trazarRutasGuardar')->name('operaciones.trazar.guardar');
         Route::get('exportar',                             'exportar')->name('operaciones.exportar');
         Route::get('exportar/acopios.csv',                 'exportarAcopiosCsv')->name('operaciones.exportar.acopios');
         Route::get('exportar/acopios/imprimir',            'exportarAcopiosImprimir')->name('operaciones.exportar.acopios.imprimir');

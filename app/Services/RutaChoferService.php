@@ -18,8 +18,9 @@ use Illuminate\Support\Collection;
  *   2. Zona asignada al chofer este mes (rotación mensual en "Rotación Zonas").
  *   3. Respaldo: ruta del último ganadero que acopió.
  *
- * El orden de las paradas se calcula con "vecino más cercano" partiendo de la
- * planta, que da un recorrido corto sin depender de servicios externos.
+ * Orden de las paradas: si el administrador trazó el camino de la zona en el mapa
+ * ("Trazar rutas"), se visitan en el sentido de ese trazado; si no, se usa el
+ * "vecino más cercano" partiendo de la planta, sin depender de servicios externos.
  */
 class RutaChoferService
 {
@@ -65,7 +66,9 @@ class RutaChoferService
 
         $atendidos = $this->atendidosHoy($chofer->id);
         $planta    = $this->planta();
-        $ordenados = $this->ordenarPorCercania($ganaderos, $planta);
+        $ordenados = $zona?->tieneTrazado()
+            ? self::ordenarPorTrazado($ganaderos, $zona)
+            : $this->ordenarPorCercania($ganaderos, $planta);
 
         $paradas = $ordenados->values()->map(fn (Ganadero $g, int $i) => [
             'id'              => $g->id,
@@ -94,6 +97,9 @@ class RutaChoferService
             'total'         => $paradas->count(),
             'atendidos'     => $paradas->where('atendido', true)->count(),
             'paradas'       => $paradas->all(),
+            // Camino trazado por el administrador ([[lat, lon], ...]); vacío = la app calcula uno
+            'trazado'       => $zona?->tieneTrazado() ? $zona->trazado : [],
+            'trazado_km'    => $zona?->tieneTrazado() ? (float) $zona->trazado_km : null,
             // Formato anterior: se mantiene para versiones antiguas de la app
             'ganaderos'     => $ganaderos,
         ];
@@ -129,6 +135,17 @@ class RutaChoferService
         $campo    = AcopioCampo::where('chofer_id', $choferId)->whereDate('created_at', $hoy)->pluck('ganadero_id');
 
         return $clasicos->merge($campo)->unique()->values();
+    }
+
+    /** En el sentido del trazado (km recorridos hasta cada predio); los que no tienen GPS van al final. */
+    public static function ordenarPorTrazado(Collection $ganaderos, \App\Models\Zona $zona): Collection
+    {
+        [$conGps, $sinGps] = $ganaderos->partition(fn ($g) => $g->geo_lat !== null && $g->geo_lon !== null);
+
+        return $conGps
+            ->sortBy(fn ($g) => $zona->posicionEnTrazado((float) $g->geo_lat, (float) $g->geo_lon)[0])
+            ->values()
+            ->merge($sinGps->values());
     }
 
     /** Vecino más cercano desde la planta; los que no tienen GPS van al final. */

@@ -20,6 +20,8 @@ class Zona extends Model
         'centro_lat',
         'centro_lon',
         'poligono',
+        'trazado',
+        'trazado_km',
         'color',
     ];
 
@@ -28,7 +30,65 @@ class Zona extends Model
         'centro_lat' => 'float',
         'centro_lon' => 'float',
         'poligono'   => 'array',
+        'trazado'    => 'array',
+        'trazado_km' => 'float',
     ];
+
+    public function tieneTrazado(): bool
+    {
+        return is_array($this->trazado) && count($this->trazado) >= 2;
+    }
+
+    /**
+     * Proyecta un punto sobre el trazado de la ruta.
+     * Devuelve [km recorridos por el trazado hasta ese punto, distancia en metros del punto al trazado],
+     * o null si la zona no tiene trazado. Sirve para ordenar las paradas en el sentido del camino.
+     */
+    public function posicionEnTrazado(float $lat, float $lon): ?array
+    {
+        if (! $this->tieneTrazado()) {
+            return null;
+        }
+
+        // Plano local en km (equirectangular): suficiente para distancias de una ruta rural
+        $kx = 111.32 * cos(deg2rad($lat));
+        $ky = 110.574;
+        $px = $lon * $kx;
+        $py = $lat * $ky;
+
+        $mejor = null;
+        $acumulado = 0.0;
+        $puntos = $this->trazado;
+        for ($i = 0; $i < count($puntos) - 1; $i++) {
+            [$aLat, $aLon] = $puntos[$i];
+            [$bLat, $bLon] = $puntos[$i + 1];
+            $ax = $aLon * $kx; $ay = $aLat * $ky;
+            $bx = $bLon * $kx; $by = $bLat * $ky;
+            $dx = $bx - $ax; $dy = $by - $ay;
+            $largo2 = $dx * $dx + $dy * $dy;
+            $t = $largo2 > 0 ? max(0, min(1, (($px - $ax) * $dx + ($py - $ay) * $dy) / $largo2)) : 0;
+            $distancia = hypot($px - ($ax + $t * $dx), $py - ($ay + $t * $dy));
+            $largo = sqrt($largo2);
+
+            if ($mejor === null || $distancia < $mejor[1]) {
+                $mejor = [$acumulado + $t * $largo, $distancia];
+            }
+            $acumulado += $largo;
+        }
+
+        return [round($mejor[0], 3), round($mejor[1] * 1000)];
+    }
+
+    /** Largo del trazado en km. */
+    public static function largoKm(array $puntos): float
+    {
+        $km = 0.0;
+        for ($i = 0; $i < count($puntos) - 1; $i++) {
+            $km += \App\Services\RutaChoferService::distanciaKm(
+                (float) $puntos[$i][0], (float) $puntos[$i][1], (float) $puntos[$i + 1][0], (float) $puntos[$i + 1][1]);
+        }
+        return round($km, 2);
+    }
 
     /** ¿El punto cae dentro del polígono de la zona? (ray casting) */
     public function contiene(float $lat, float $lon): bool
