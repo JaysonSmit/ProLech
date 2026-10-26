@@ -969,5 +969,7 @@
     </div>
 </main>
 
+{{-- Scripts y estilos que agregan las vistas con @push('scripts') (p. ej. el modal de publicar receta) --}}
+@stack('scripts')
 </body>
 </html>
