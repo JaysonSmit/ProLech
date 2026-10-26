@@ -85,6 +85,7 @@ class MiRutaViewModel(
     private val permiso = MutableStateFlow(proveedor.tienePermiso())
     private val inicioDelDia = inicioDelDia()
     private var trabajoPlan: Job? = null
+    private var ultimaDescarga = 0L
 
     /** Acopios de HOY registrados en el celular (aunque aún no se hayan sincronizado). */
     private val acopiosHoy = observarAcopios().map { acopios -> acopios.filter { it.actualizadoEn >= inicioDelDia } }
@@ -163,7 +164,17 @@ class MiRutaViewModel(
         }
     }
 
+    /**
+     * El chofer vuelve a la pantalla (o a la app): se descarga de nuevo la ruta para ver
+     * los cambios del administrador (otra ruta, proveedores, camino trazado). Como mucho
+     * una vez cada 30 s para no repetir la descarga del inicio.
+     */
+    fun alVolverAPantalla() {
+        if (reloj() - ultimaDescarga >= 30_000) refrescar(silencioso = true)
+    }
+
     fun refrescar(silencioso: Boolean = false) {
+        ultimaDescarga = reloj()
         viewModelScope.launch {
             if (!monitor.hayConexion()) {
                 cargando.value = false

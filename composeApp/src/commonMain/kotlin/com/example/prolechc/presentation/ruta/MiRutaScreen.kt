@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.prolechc.domain.model.Parada
 import com.example.prolechc.domain.model.PlanRuta
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.example.prolechc.domain.ruta.Geo
 import com.example.prolechc.domain.ruta.coordenada
 import com.example.prolechc.presentation.colorCarga
@@ -68,6 +69,12 @@ fun MiRutaScreen(
     var centrar by remember { mutableIntStateOf(0) }
     val pedirPermiso = rememberSolicitarPermisoUbicacion(viewModel::onPermisoResultado)
     val uri = LocalUriHandler.current
+
+    // Al volver a «Mi ruta» se descargan los cambios del administrador
+    LifecycleResumeEffect(Unit) {
+        viewModel.alVolverAPantalla()
+        onPauseOrDispose { }
+    }
 
     LaunchedEffect(state.mensaje) {
         state.mensaje?.let { snackbar.showSnackbar(it); viewModel.limpiarMensaje() }
