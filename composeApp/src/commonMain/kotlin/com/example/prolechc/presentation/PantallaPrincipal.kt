@@ -23,6 +23,9 @@ import com.example.prolechc.domain.model.GanaderoCampo
 import com.example.prolechc.presentation.acopios.AcopioScreen
 import com.example.prolechc.presentation.acopios.AcopioViewModel
 import com.example.prolechc.presentation.ruta.MiRutaScreen
+import com.example.prolechc.data.local.ConfigLocal
+import com.example.prolechc.presentation.ruta.MiRutaViewModel
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 private enum class Pestana(val titulo: String, val icono: String) {
@@ -37,6 +40,21 @@ fun PantallaPrincipal(onSesionCerrada: () -> Unit) {
     // Una sola instancia: desde la ruta se preselecciona el ganadero del formulario de acopio
     val acopioViewModel: AcopioViewModel = koinViewModel()
     val acopios by acopioViewModel.uiState.collectAsStateWithLifecycle()
+    val rutaViewModel: MiRutaViewModel = koinViewModel()
+    val config: ConfigLocal = koinInject()
+    var verCuenta by rememberSaveable { mutableStateOf(false) }
+
+    if (verCuenta) {
+        DialogoCuenta(
+            config             = config,
+            pendientes         = acopios.pendientes,
+            sincronizando      = acopios.sincronizando,
+            onSincronizar      = acopioViewModel::sincronizar,
+            onServidorCambiado = { acopioViewModel.sincronizar(); rutaViewModel.refrescar(silencioso = true) },
+            onCerrarSesion     = { verCuenta = false; acopioViewModel.cerrarSesion(onSesionCerrada) },
+            onCerrar           = { verCuenta = false }
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -58,12 +76,20 @@ fun PantallaPrincipal(onSesionCerrada: () -> Unit) {
                         )
                     )
                 }
+                // No es una pestaña: abre el diálogo de la cuenta (servidor, sincronizar, cerrar sesión)
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { verCuenta = true },
+                    icon = { Text("👤", fontSize = 22.sp) },
+                    label = { Text("Cuenta") }
+                )
             }
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when (pestana) {
                 Pestana.RUTA -> MiRutaScreen(
+                    viewModel = rutaViewModel,
                     onRegistrarAcopio = { parada ->
                         acopioViewModel.onGanaderoSeleccionado(
                             GanaderoCampo(

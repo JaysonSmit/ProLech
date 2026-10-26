@@ -6,6 +6,9 @@ import com.example.prolechc.domain.model.Coordenada
 import com.example.prolechc.domain.model.Parada
 import com.example.prolechc.domain.ruta.Geo
 import com.example.prolechc.domain.ruta.PlanificadorRuta
+import com.example.prolechc.domain.model.Ruta
+import com.example.prolechc.presentation.ruta.describirCambioDeRuta
+import kotlin.test.assertNull
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,5 +50,25 @@ class TrazadoRutaTest {
         assertEquals(trazo, plan.trazo)
         assertEquals(Geo.distanciaTotalKm(trazo), plan.distanciaKm, 1e-9)
         assertTrue(plan.trazadoPorPlanta)
+    }
+
+    private fun ruta(nombre: String, vararg ids: Int, trazado: List<Coordenada> = emptyList()) = Ruta(
+        asignacionId = 1, rutaCodigo = nombre, rutaNombre = nombre, vehiculoPlaca = "", vehiculoMarca = "",
+        capacidadLitros = 1500.0, fecha = "", paradas = ids.mapIndexed { i, id -> parada(id, i + 1) }, trazado = trazado
+    )
+
+    @Test
+    fun avisa_al_chofer_cuando_cambia_su_ruta_sus_proveedores_o_el_camino() {
+        assertEquals("Ahora tu ruta es HUATA1, con 2 proveedor(es).",
+            describirCambioDeRuta(ruta("Collana 1", 1, 2, 3), ruta("HUATA1", 4, 5)))
+
+        val cambio = describirCambioDeRuta(ruta("HUATA1", 1, 2), ruta("HUATA1", 2, 3))!!
+        assertTrue("Nuevos: G3" in cambio && "Ya no visitas: G1" in cambio)
+
+        assertTrue("nuevo camino" in describirCambioDeRuta(ruta("HUATA1", 1),
+            ruta("HUATA1", 1, trazado = listOf(Coordenada(-15.6, -70.0), Coordenada(-15.7, -70.1))))!!)
+
+        // Solo cambió quién fue atendido: no se molesta al chofer
+        assertNull(describirCambioDeRuta(ruta("HUATA1", 1, 2), ruta("HUATA1", 1, 2)))
     }
 }

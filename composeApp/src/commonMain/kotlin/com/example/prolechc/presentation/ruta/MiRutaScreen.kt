@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -70,10 +71,25 @@ fun MiRutaScreen(
     val pedirPermiso = rememberSolicitarPermisoUbicacion(viewModel::onPermisoResultado)
     val uri = LocalUriHandler.current
 
-    // Al volver a «Mi ruta» se descargan los cambios del administrador
+    // Al volver a «Mi ruta» se descargan los cambios del administrador, y cada 2 min mientras está abierta
     LifecycleResumeEffect(Unit) {
         viewModel.alVolverAPantalla()
         onPauseOrDispose { }
+    }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(120_000)
+            viewModel.alVolverAPantalla()
+        }
+    }
+    val avisoRuta by viewModel.avisoRuta.collectAsStateWithLifecycle()
+    avisoRuta?.let { texto ->
+        AlertDialog(
+            onDismissRequest = viewModel::cerrarAvisoRuta,
+            title = { Text("🔄 Tu ruta cambió") },
+            text = { Text(texto) },
+            confirmButton = { TextButton(onClick = viewModel::cerrarAvisoRuta) { Text("Entendido") } }
+        )
     }
 
     LaunchedEffect(state.mensaje) {

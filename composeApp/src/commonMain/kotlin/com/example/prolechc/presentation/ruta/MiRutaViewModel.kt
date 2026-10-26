@@ -86,6 +86,13 @@ class MiRutaViewModel(
     private val inicioDelDia = inicioDelDia()
     private var trabajoPlan: Job? = null
     private var ultimaDescarga = 0L
+    private var rutaConocida: Ruta? = null
+    private val _avisoRuta = MutableStateFlow<String?>(null)
+
+    /** Aviso cuando la planta cambia la ruta del chofer (otra ruta, proveedores o camino). */
+    val avisoRuta: StateFlow<String?> = _avisoRuta
+
+    fun cerrarAvisoRuta() { _avisoRuta.value = null }
 
     /** Acopios de HOY registrados en el celular (aunque aún no se hayan sincronizado). */
     private val acopiosHoy = observarAcopios().map { acopios -> acopios.filter { it.actualizadoEn >= inicioDelDia } }
@@ -155,6 +162,13 @@ class MiRutaViewModel(
 
         // Al RECUPERAR la señal se descarga la ruta (drop(1): el valor inicial ya lo cubre refrescar())
         monitor.enLinea.drop(1).filter { it }.onEach { refrescar(silencioso = true) }.launchIn(viewModelScope)
+
+        // Cada ruta que llega del servidor se compara con la anterior para avisar al chofer
+        repositorio.observar().map { it?.ruta }.filterNotNull().onEach { ruta ->
+            val anterior = rutaConocida
+            rutaConocida = ruta
+            if (anterior != null) describirCambioDeRuta(anterior, ruta)?.let { _avisoRuta.value = it }
+        }.launchIn(viewModelScope)
 
         // Si el GPS falla (permiso revocado, GPS apagado) se avisa al chofer
         rastreo.error.filterNotNull().onEach { mensaje.value = "GPS: $it" }.launchIn(viewModelScope)
@@ -289,4 +303,27 @@ class MiRutaViewModel(
         (lat * 300).toLong() / 300.0,
         (lon * 300).toLong() / 300.0
     )
+}
+
+/** Texto para el chofer si la ruta cambió en algo que le importa; null si es la misma. */
+internal fun describirCambioDeRuta(antes: Ruta, ahora: Ruta): String? {
+    if (antes.rutaNombre != ahora.rutaNombre) {
+        return "Ahora tu ruta es ${ahora.rutaNombre}, con ${ahora.paradas.size} proveedor(es)."
+    }
+    val idsAntes = antes.paradas.map { it.ganaderoId }.toSet()
+    val idsAhora = ahora.paradas.map { it.ganaderoId }.toSet()
+    val nuevos = ahora.paradas.filter { it.ganaderoId !in idsAntes }.map { it.ganaderoNombre }
+    val quitados = antes.paradas.filter { it.ganaderoId !in idsAhora }.map { it.ganaderoNombre }
+    if (nuevos.isNotEmpty() || quitados.isNotEmpty()) {
+        return buildString {
+            append("La planta cambió los proveedores de ${ahora.rutaNombre}.")
+            if (nuevos.isNotEmpty()) append("\nNuevos: ${nuevos.joinToString()}.")
+            if (quitados.isNotEmpty()) append("\nYa no visitas: ${quitados.joinToString()}.")
+        }
+    }
+    if (antes.trazado != ahora.trazado) {
+        return if (ahora.trazado.isEmpty()) "La planta quitó el camino trazado de ${ahora.rutaNombre}: se sugerirá uno automático."
+        else "La planta trazó un nuevo camino para ${ahora.rutaNombre}. Síguelo en el mapa."
+    }
+    return null
 }
