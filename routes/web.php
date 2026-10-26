@@ -205,6 +205,10 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
         Route::post('zonas/mapa/{ganadero}',               'zonasMapaGuardar')->name('operaciones.zonas.guardar');
         Route::get('rutas/trazar',                         'trazarRutas')->name('operaciones.trazar');
         Route::post('rutas/trazar/{zona}',                 'trazarRutasGuardar')->name('operaciones.trazar.guardar');
+        Route::post('rutas',                               'rutaCrear')->name('operaciones.rutas.crear');
+        Route::put('rutas/{zona}',                         'rutaActualizar')->whereNumber('zona')->name('operaciones.rutas.actualizar');
+        Route::post('rutas/{zona}/proveedores',            'rutaProveedores')->whereNumber('zona')->name('operaciones.rutas.proveedores');
+        Route::post('rutas/{zona}/chofer',                 'rutaChofer')->whereNumber('zona')->name('operaciones.rutas.chofer');
         Route::get('exportar',                             'exportar')->name('operaciones.exportar');
         Route::get('exportar/acopios.csv',                 'exportarAcopiosCsv')->name('operaciones.exportar.acopios');
         Route::get('exportar/acopios/imprimir',            'exportarAcopiosImprimir')->name('operaciones.exportar.acopios.imprimir');

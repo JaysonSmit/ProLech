@@ -784,8 +784,8 @@
         </a>
         <a href="{{ route('admin.operaciones.trazar') }}"
            class="nav-link {{ request()->routeIs('admin.operaciones.trazar*') ? 'active' : '' }}">
-            <span class="nav-icon">✏️</span>
-            <span>Trazar rutas</span>
+            <span class="nav-icon">🗺️</span>
+            <span>Rutas y choferes</span>
         </a>
         <a href="{{ route('admin.operaciones.exportar') }}"
            class="nav-link {{ request()->routeIs('admin.operaciones.exportar*') ? 'active' : '' }}">

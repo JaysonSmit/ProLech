@@ -140,9 +140,81 @@ class TrazadoYRotacionTest extends TestCase
     public function test_pagina_de_trazar_rutas_solo_para_administrador(): void
     {
         $this->zona('C1', 1);
-        $this->comoAdmin()->get('/admin/rutas/trazar')->assertOk()->assertSee('Trazar la ruta')->assertSee('Collana 1');
+        $this->comoAdmin()->get('/admin/rutas/trazar')->assertOk()->assertSee('Rutas: proveedores, chofer y camino')->assertSee('Collana 1');
 
         $chofer = User::factory()->create(['rol' => 'chofer', 'activo' => true]);
         $this->actingAs($chofer)->withSession(['2fa_verified' => true])->get('/admin/rutas/trazar')->assertForbidden();
+    }
+
+    // ── Gestión de rutas: crear, proveedores, chofer, eliminar ─────────────
+
+    public function test_crear_ruta_nueva_con_codigo_unico(): void
+    {
+        $r = $this->comoAdmin()->postJson('/admin/rutas', ['nombre' => 'Collana 5', 'color' => '#0ea5e9'])->assertCreated();
+
+        $this->assertSame('COLLANA-5', $r->json('zona.codigo'));
+        $this->assertTrue(Zona::where('nombre', 'Collana 5')->value('activa'));
+        $this->comoAdmin()->postJson('/admin/rutas', ['nombre' => 'Collana 5'])->assertStatus(422);
+    }
+
+    public function test_agregar_y_quitar_proveedores_cambia_la_ruta_del_chofer(): void
+    {
+        $zona = $this->zona('C5', 5);
+        $g = Ganadero::create(['dni' => '7', 'nombre' => 'Nuevo', 'activo' => true, 'geo_lat' => -15.7, 'geo_lon' => -70.0]);
+        $chofer = User::factory()->create(['rol' => 'chofer', 'activo' => true]);
+        $this->asignar($chofer, $zona);
+
+        $this->comoAdmin()->postJson("/admin/rutas/{$zona->id}/proveedores", ['ganadero_ids' => [$g->id], 'accion' => 'agregar'])
+            ->assertOk()->assertJsonPath('paradas.0.nombre', 'Nuevo');
+        Sanctum::actingAs($chofer);
+        $this->getJson('/api/mi-ruta')->assertOk()->assertJsonPath('total', 1);
+
+        $this->comoAdmin()->postJson("/admin/rutas/{$zona->id}/proveedores", ['ganadero_ids' => [$g->id], 'accion' => 'quitar'])
+            ->assertOk()->assertJsonPath('paradas', []);
+        $this->assertNull($g->fresh()->zona_id);
+    }
+
+    public function test_elegir_chofer_de_la_ruta_intercambia_y_se_puede_quitar(): void
+    {
+        [$z1, $z2] = [$this->zona('C1', 1), $this->zona('C2', 2)];
+        $carlos = User::factory()->create(['rol' => 'chofer', 'activo' => true]);
+        $miguel = User::factory()->create(['rol' => 'chofer', 'activo' => true]);
+        $this->asignar($carlos, $z1);
+        $this->asignar($miguel, $z2);
+
+        $r = $this->comoAdmin()->postJson("/admin/rutas/{$z2->id}/chofer", ['chofer_id' => $carlos->id])->assertOk();
+        $this->assertSame($carlos->id, $r->json("titulares.{$z2->id}.id"));
+        $this->assertSame($z1->id, $this->zonaDe($miguel));
+
+        $this->comoAdmin()->postJson("/admin/rutas/{$z2->id}/chofer", ['chofer_id' => null])->assertOk();
+        $this->assertNull($this->zonaDe($carlos));
+        $this->comoAdmin()->postJson("/admin/rutas/{$z2->id}/chofer", ['chofer_id' => $this->admin->id])->assertStatus(422);
+    }
+
+    public function test_eliminar_ruta_exige_que_no_tenga_proveedores(): void
+    {
+        $zona = $this->zona('C5', 5);
+        $g = Ganadero::create(['dni' => '8', 'nombre' => 'Uno', 'activo' => true, 'zona_id' => $zona->id]);
+        $chofer = User::factory()->create(['rol' => 'chofer', 'activo' => true]);
+        $this->asignar($chofer, $zona);
+
+        $this->comoAdmin()->putJson("/admin/rutas/{$zona->id}", ['activa' => false])->assertStatus(422);
+
+        $g->update(['zona_id' => null]);
+        $this->comoAdmin()->putJson("/admin/rutas/{$zona->id}", ['activa' => false])->assertOk();
+        $this->assertFalse($zona->fresh()->activa);
+        $this->assertSame('volante', AsignacionZona::where('chofer_id', $chofer->id)->value('rol_mes'));
+    }
+
+    public function test_rotacion_automatica_funciona_con_mas_de_cuatro_rutas(): void
+    {
+        foreach (range(1, 5) as $i) $this->zona("C{$i}", $i);
+        $ids = User::factory()->count(6)->create(['rol' => 'chofer', 'activo' => true])->pluck('id')->all();
+
+        $creadas = AsignacionZona::generarRotacion($ids, now()->month, now()->year);
+
+        $this->assertCount(6, $creadas);
+        $this->assertSame(1, collect($creadas)->where('rol_mes', 'volante')->count());
+        $this->assertSame(6, collect($creadas)->pluck('chofer_id')->unique()->count());
     }
 }

@@ -38,6 +38,46 @@ class AsignacionZona extends Model
         return $this->belongsTo(Zona::class);
     }
 
+    /**
+     * Asigna un chofer a una zona (o como volante si $zonaId es null) en un mes.
+     * Cada zona tiene un solo titular por mes: si ya la ocupa otro chofer, intercambian
+     * (el otro pasa a la zona que tenía este chofer, o queda como volante).
+     *
+     * @return string|null descripción del intercambio, o null si no hubo
+     */
+    public static function asignar(int $choferId, ?int $zonaId, int $mes, int $anio, ?string $notas = null): ?string
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($choferId, $zonaId, $mes, $anio, $notas) {
+            $anterior = self::where('chofer_id', $choferId)->where('mes', $mes)->where('anio', $anio)->lockForUpdate()->first();
+            $ocupante = $zonaId
+                ? self::where('zona_id', $zonaId)->where('mes', $mes)->where('anio', $anio)
+                    ->where('chofer_id', '!=', $choferId)->lockForUpdate()->first()
+                : null;
+
+            $ocupante?->update(['zona_id' => null]);   // libera la zona antes de reasignarla
+
+            $inicio = Carbon::createFromDate($anio, $mes, 1);
+            self::updateOrCreate(
+                ['chofer_id' => $choferId, 'mes' => $mes, 'anio' => $anio],
+                [
+                    'zona_id'      => $zonaId,
+                    'rol_mes'      => $zonaId ? 'titular' : 'volante',
+                    'fecha_inicio' => $inicio->toDateString(),
+                    'fecha_fin'    => $inicio->copy()->endOfMonth()->toDateString(),
+                    'notas'        => $notas ?? $anterior?->notas,
+                ]
+            );
+
+            if (! $ocupante) {
+                return null;
+            }
+            $zonaPrevia = $anterior?->zona_id;
+            $ocupante->update(['zona_id' => $zonaPrevia, 'rol_mes' => $zonaPrevia ? 'titular' : 'volante']);
+
+            return $ocupante->chofer?->name . ' pasa a ' . ($zonaPrevia ? Zona::find($zonaPrevia)?->nombre : 'volante');
+        });
+    }
+
     // ── Lógica de rotación ────────────────────────────────────────────────────
 
     /**
@@ -60,7 +100,7 @@ class AsignacionZona extends Model
         $numCh     = count($chofereIds); // 5
 
         if ($numCh < $numZonas + 1) {
-            throw new \InvalidArgumentException("Se necesitan al menos " . ($numZonas + 1) . " choferes (4 titulares + 1 volante).");
+            throw new \InvalidArgumentException("Se necesitan al menos " . ($numZonas + 1) . " choferes ({$numZonas} titulares + 1 volante).");
         }
 
         // Obtener asignaciones del mes anterior para determinar el orden actual
@@ -92,9 +132,9 @@ class AsignacionZona extends Model
                     'fecha_fin'    => $fechaFin->toDateString(),
                 ]);
             }
-            // El 5to chofer es el volante
+            // El chofer siguiente al último titular es el volante
             $creadas[] = self::create([
-                'chofer_id'    => $chofereIds[4],
+                'chofer_id'    => $chofereIds[$numZonas],
                 'zona_id'      => null,
                 'mes'          => $mes,
                 'anio'         => $anio,
