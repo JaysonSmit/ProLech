@@ -47,6 +47,16 @@
         --purple:       #7c3aed;
         --purple-bg:    #ede9fe;
 
+        /* Nombres de la paleta anterior: aún los usan algunas vistas (solicitudes de ruta, reportes…) */
+        --blanco:       #ffffff;
+        --azul:         var(--blue);
+        --verde:        var(--green);
+        --rojo:         var(--red);
+        --naranja:      var(--amber);
+        --texto:        var(--text);
+        --texto-suave:  var(--text-muted);
+        --gris-borde:   var(--border);
+
         /* Layout */
         --sidebar-w:    256px;
         --header-h:     64px;
@@ -644,7 +654,9 @@
     nav[aria-label] { margin-top: 14px; }
 
     /* Entrada suave del contenido */
-    .content > * { animation: fadeUp .35s ease both; }
+    /* "backwards": al terminar, cada elemento vuelve a su propia opacidad. Con "both" la animación
+       dejaba opacity:1 fija y un modal oculto con opacity:0 (Solicitudes de ruta) quedaba visible. */
+    .content > :not(.modal-overlay) { animation: fadeUp .35s ease backwards; }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
     /* Responsive */
