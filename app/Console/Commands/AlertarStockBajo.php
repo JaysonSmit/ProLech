@@ -35,7 +35,7 @@ class AlertarStockBajo extends Command
         ))->implode('; ');
 
         $avisados = 0;
-        User::whereIn('rol', ['admin', 'jefe_produccion'])->where('activo', true)->pluck('id')
+        User::conRol('admin', 'jefe_produccion')->where('activo', true)->pluck('id')
             ->each(function (int $id) use ($insumos, $lista, &$avisados) {
                 $yaAvisado = Notificacion::where('user_id', $id)->where('tipo', 'stock_bajo')
                     ->whereDate('created_at', today())->exists();

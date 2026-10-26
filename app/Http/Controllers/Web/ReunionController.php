@@ -29,7 +29,7 @@ class ReunionController extends Controller
             ->get();
 
         // Usuarios disponibles para invitar (choferes y ganaderos activos)
-        $usuariosInvitables = User::whereIn('rol', ['chofer', 'ganadero'])
+        $usuariosInvitables = User::conRol('chofer', 'ganadero')
             ->where('activo', true)
             ->orderBy('name')
             ->get(['id', 'name', 'rol']);
@@ -91,7 +91,7 @@ class ReunionController extends Controller
         $invitadosExplicitos = collect($validated['invitados'] ?? []);
 
         // Todos los choferes activos
-        $chofereIds = User::where('rol', 'chofer')
+        $chofereIds = User::conRol('chofer')
                           ->where('activo', true)
                           ->pluck('id');
 

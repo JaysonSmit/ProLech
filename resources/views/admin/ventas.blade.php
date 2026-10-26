@@ -412,7 +412,7 @@
                                     onclick="abrirModalDespachoDesdeBtn(this)">
                                 🚚 Despacho
                             </button>
-                            @if(in_array(auth()->user()->rol, ['admin', 'jefe_produccion'], true) && $venta->estado_despacho !== 'entregado')
+                            @if(auth()->user()->tieneRol('admin', 'jefe_produccion') && $venta->estado_despacho !== 'entregado')
                             <button type="button" class="btn btn-sm"
                                     style="background:#fef2f2;color:#b91c1c;border:1px solid #fca5a5;font-size:.75rem;padding:4px 8px;cursor:pointer"
                                     data-id="{{ $venta->id }}" data-cliente="{{ $venta->cliente }}"

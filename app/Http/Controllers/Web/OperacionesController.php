@@ -134,7 +134,7 @@ class OperacionesController extends Controller
     public function recorrido(Request $request): View
     {
         $fecha = Carbon::parse($request->query('fecha', now()->toDateString()));
-        $choferes = User::where('rol', 'chofer')->orderBy('name')->get(['id', 'name']);
+        $choferes = User::conRol('chofer')->orderBy('name')->get(['id', 'name']);
 
         // Km del día por chofer (todos los que enviaron puntos)
         $kmPorChofer = TrackingGpsPunto::whereDate('registrado_en', $fecha->toDateString())
@@ -265,7 +265,7 @@ class OperacionesController extends Controller
             'zonas'     => $zonas,
             'ganaderos' => $ganaderos,
             'paradas'   => $zonas->mapWithKeys(fn (Zona $z) => [$z->id => $this->paradasDeZona($z)]),
-            'choferes'  => User::where('rol', 'chofer')->where('activo', true)->orderBy('name')->get(['id', 'name']),
+            'choferes'  => User::conRol('chofer')->where('activo', true)->orderBy('name')->get(['id', 'name']),
             'titulares' => $this->titularesDelMes(),
             'mes'       => now()->month,
             'anio'      => now()->year,
@@ -370,7 +370,9 @@ class OperacionesController extends Controller
     public function rutaChofer(Request $request, Zona $zona): JsonResponse
     {
         $validated = $request->validate([
-            'chofer_id' => ['nullable', \Illuminate\Validation\Rule::exists('users', 'id')->where('rol', 'chofer')],
+            'chofer_id' => ['nullable', 'integer', function ($campo, $valor, $falla) {
+                if ($valor !== null && ! User::conRol('chofer')->whereKey($valor)->exists()) $falla('El usuario elegido no es chofer.');
+            }],
         ]);
         $mes = now()->month;
         $anio = now()->year;

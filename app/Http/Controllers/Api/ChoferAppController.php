@@ -32,7 +32,7 @@ class ChoferAppController extends Controller
         ]);
 
         $usuario = $request->user();
-        if ($usuario->rol !== 'admin') {
+        if (! $usuario->tieneRol('admin')) {
             $ruta = $rutas->rutaDe($usuario);
             $idsRuta = collect($ruta['paradas'] ?? [])->pluck('ganadero_id');
             if (! $idsRuta->contains($ganadero->id)) {

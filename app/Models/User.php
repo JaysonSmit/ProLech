@@ -18,6 +18,7 @@ class User extends Authenticatable
         'email',
         'password',
         'rol',
+        'roles_extra',
         'activo',
         'google2fa_secret',
         'two_factor_confirmed',
@@ -41,7 +42,32 @@ class User extends Authenticatable
             'activo'               => 'boolean',
             'two_factor_confirmed' => 'boolean',
             'otp_activo'           => 'boolean',
+            'roles_extra'          => 'array',
         ];
+    }
+
+    // ── Varios roles: el principal (columna rol) + accesos adicionales (roles_extra) ──
+
+    /** @return list<string> todos los roles del usuario, el principal primero */
+    public function roles(): array
+    {
+        return array_values(array_unique(array_filter([$this->rol, ...($this->roles_extra ?? [])])));
+    }
+
+    public function tieneRol(string ...$roles): bool
+    {
+        return (bool) array_intersect($this->roles(), $roles);
+    }
+
+    /** Usuarios con ese rol, sea el principal o un acceso adicional. */
+    public function scopeConRol($query, string ...$roles)
+    {
+        return $query->where(function ($q) use ($roles) {
+            $q->whereIn('rol', $roles);
+            foreach ($roles as $rol) {
+                $q->orWhereJsonContains('roles_extra', $rol);
+            }
+        });
     }
 
     // ── Helpers 2FA ───────────────────────────────────────────────────────────
@@ -53,26 +79,37 @@ class User extends Authenticatable
 
     public function requiereTwoFactor(): bool
     {
-        return in_array($this->rol, ['admin', 'chofer', 'jefe_produccion'], true);
+        return $this->tieneRol('admin', 'chofer', 'jefe_produccion');
     }
 
     // ── Scopes de rol ──────────────────────────────────────────────────────────
-    public function scopeAdmin($query)     { return $query->where('rol', 'admin'); }
-    public function scopeChoferes($query)  { return $query->where('rol', 'chofer'); }
+    public function scopeAdmin($query)     { return $query->conRol('admin'); }
+    public function scopeChoferes($query)  { return $query->conRol('chofer'); }
     public function scopeGanaderos($query) { return $query->where('rol', 'ganadero'); }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
-    public function isAdmin(): bool    { return $this->rol === 'admin'; }
-    public function isChofer(): bool   { return $this->rol === 'chofer'; }
+    public function isAdmin(): bool    { return $this->tieneRol('admin'); }
+    public function isChofer(): bool   { return $this->tieneRol('chofer'); }
     public function isGanadero(): bool { return $this->rol === 'ganadero'; }
 
     public function seccionWebPermitida(string $seccion): bool
     {
-        return \App\Support\RolWeb::permite($this->rol, $seccion);
+        foreach ($this->roles() as $rol) {
+            if (\App\Support\RolWeb::permite($rol, $seccion)) {
+                return true;
+            }
+        }
+        return false;
     }
 
+    /** Pantalla de inicio: la del primer rol (principal primero) que tenga panel web. */
     public function rutaInicioWeb(): string
     {
+        foreach ($this->roles() as $rol) {
+            if (\App\Support\RolWeb::secciones($rol) || $rol === 'proveedor') {
+                return \App\Support\RolWeb::rutaInicio($rol);
+            }
+        }
         return \App\Support\RolWeb::rutaInicio($this->rol);
     }
 

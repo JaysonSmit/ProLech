@@ -277,7 +277,7 @@ class AdminDashboardController extends Controller
     /** Anula la venta y devuelve el stock. Solo administrador y jefe de producción. */
     public function anularVenta(Request $request, Venta $venta): RedirectResponse
     {
-        abort_unless(in_array($request->user()->rol, ['admin', 'jefe_produccion'], true), 403,
+        abort_unless($request->user()->tieneRol('admin', 'jefe_produccion'), 403,
             'Solo el administrador o el jefe de producción pueden anular ventas.');
 
         $validated = $request->validate([

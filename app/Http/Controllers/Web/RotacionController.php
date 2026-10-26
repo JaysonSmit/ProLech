@@ -23,7 +23,7 @@ class RotacionController extends Controller
         $anio = (int) $request->query('anio', now()->year);
 
         $zonas    = Zona::where('activa', true)->orderBy('orden')->get();
-        $choferes = User::where('rol', 'chofer')->where('activo', true)->get(['id', 'name', 'email']);
+        $choferes = User::conRol('chofer')->where('activo', true)->get(['id', 'name', 'email']);
 
         $asignaciones = AsignacionZona::with(['chofer:id,name', 'zona'])
             ->where('mes', $mes)
@@ -74,7 +74,7 @@ class RotacionController extends Controller
             return back()->with('error', "Ya existen asignaciones para {$mes}/{$anio}. Bórralas primero si deseas regenerar.");
         }
 
-        $choferes = User::where('rol', 'chofer')
+        $choferes = User::conRol('chofer')
                         ->where('activo', true)
                         ->orderBy('id')
                         ->pluck('id')

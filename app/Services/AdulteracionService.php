@@ -84,7 +84,7 @@ class AdulteracionService
     {
         try {
             // Administrador activo (user id 1 por convención si no hay)
-            $adminId = User::where('rol', 'admin')->where('activo', true)->value('id') ?? 1;
+            $adminId = User::conRol('admin')->where('activo', true)->orderBy('id')->value('id') ?? 1;
 
             Notificacion::enviar(
                 userId:       $adminId,

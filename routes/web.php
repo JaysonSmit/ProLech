@@ -31,12 +31,7 @@ use Illuminate\Support\Facades\Route;
 // ── Raíz: redirigir según rol ─────────────────────────────────────────────────
 Route::get('/', function () {
     if (auth()->check()) {
-        $rol = auth()->user()->rol;
-        if ($rol === 'proveedor') {
-            return redirect()->route('proveedor.dashboard');
-        }
-
-        return redirect()->route(RolWeb::rutaInicio($rol));
+        return redirect()->route(auth()->user()->rutaInicioWeb());
     }
     return redirect()->route('login');
 });
@@ -239,6 +234,7 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
     Route::get('usuarios',                             [UsuarioController::class, 'index'])->name('usuarios.index');
     Route::post('usuarios',                            [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::post('usuarios/{usuario}/toggle',           [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
+    Route::post('usuarios/{usuario}/accesos',          [UsuarioController::class, 'accesos'])->name('usuarios.accesos');
     Route::post('usuarios/{usuario}/cambiar-password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
 
     Route::get('configuracion',  [ConfiguracionController::class, 'index'])->name('configuracion.index');

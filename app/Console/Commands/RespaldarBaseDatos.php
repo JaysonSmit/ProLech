@@ -146,7 +146,7 @@ class RespaldarBaseDatos extends Command
         $this->error("Respaldo fallido: {$motivo}");
 
         try {
-            User::where('rol', 'admin')->where('activo', true)->pluck('id')->each(
+            User::conRol('admin')->where('activo', true)->pluck('id')->each(
                 fn (int $id) => Notificacion::enviar(
                     userId:  $id,
                     titulo:  '⚠️ Falló el respaldo de la base de datos',

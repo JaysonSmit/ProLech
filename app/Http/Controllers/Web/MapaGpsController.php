@@ -31,7 +31,7 @@ class MapaGpsController extends Controller
                 $t->ultima_actualizacion >= now()->subMinutes(30) && $t->estado_ruta === 'en_camino'
             ));
 
-        $totalChoferes = User::where('rol', 'chofer')->where('activo', true)->count();
+        $totalChoferes = User::conRol('chofer')->where('activo', true)->count();
 
         $sinSenial = TrackingGps::with('chofer:id,name')
             ->where('ultima_actualizacion', '<', now()->subMinutes(30))
