@@ -300,22 +300,25 @@ class ProlechDemoSeeder extends Seeder
                 0, 3
             );
 
-            foreach ($atendidos as $k => $g) {
-                $ruta[] = [(float) $g->geo_lat, (float) $g->geo_lon];
-                $agua = $k === 2 ? 6.1 : round(mt_rand(8, 25) / 10, 1);
-                AcopioCampo::firstOrNew(['uuid' => "demo-hoy-{$g->id}-" . today()->format('Ymd')])->forceFill([
-                    'chofer_id'       => $chofer->id,
-                    'ganadero_id'     => $g->id,
-                    'ganadero_nombre' => $g->nombre,
-                    'litros'          => round(mt_rand(250, 650) / 10, 1),
-                    'porcentaje_agua' => $agua,
-                    'densidad'        => 1.0305,
-                    'grasa'           => 3.6,
-                    'estado_calidad'  => $agua > 5 ? 'OBSERVADO' : 'APROBADO',
-                    'actualizado_en'  => $salida->copy()->addMinutes(25 * ($k + 1))->getTimestampMs(),
-                    'created_at'      => $salida->copy()->addMinutes(25 * ($k + 1)),
-                ])->save();
-            }
+            // Demo: los acopios de campo se reflejan en el web pero no suspenden a nadie
+            \App\Services\AdulteracionService::sinAplicar(function () use ($atendidos, $chofer, $salida, &$ruta) {
+                foreach ($atendidos as $k => $g) {
+                    $ruta[] = [(float) $g->geo_lat, (float) $g->geo_lon];
+                    $agua = $k === 2 ? 6.1 : round(mt_rand(8, 25) / 10, 1);
+                    AcopioCampo::firstOrNew(['uuid' => "demo-hoy-{$g->id}-" . today()->format('Ymd')])->forceFill([
+                        'chofer_id'       => $chofer->id,
+                        'ganadero_id'     => $g->id,
+                        'ganadero_nombre' => $g->nombre,
+                        'litros'          => round(mt_rand(250, 650) / 10, 1),
+                        'porcentaje_agua' => $agua,
+                        'densidad'        => 1.0305,
+                        'grasa'           => 3.6,
+                        'estado_calidad'  => $agua > 5 ? 'OBSERVADO' : 'APROBADO',
+                        'actualizado_en'  => $salida->copy()->addMinutes(25 * ($k + 1))->getTimestampMs(),
+                        'created_at'      => $salida->copy()->addMinutes(25 * ($k + 1)),
+                    ])->save();
+                }
+            });
 
             // Trazo GPS: puntos cada ~1 min interpolados entre paradas
             $t = $salida->copy();

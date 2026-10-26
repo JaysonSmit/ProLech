@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Acopio;
 use App\Models\Ganadero;
-use App\Models\Notificacion;
 use App\Services\RutaChoferService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -137,7 +136,6 @@ class AcopioApiController extends Controller
         // ── Calcular estado y descuento ───────────────────────────────────────
         $estado         = 'aprobado';
         $tieneDescuento = false;
-        $esAdulterado   = false;
 
         $agua     = isset($validated['porcentaje_agua']) ? (float) $validated['porcentaje_agua'] : 0.0;
         $ph       = isset($validated['acidez_ph'])       ? (float) $validated['acidez_ph']       : 0.0;
@@ -145,7 +143,6 @@ class AcopioApiController extends Controller
 
         $estado         = Acopio::calcularEstado($agua, $ph, $densidad);
         $tieneDescuento = Acopio::calcularDescuento($agua);
-        $esAdulterado   = in_array($estado, ['rechazado', 'observado']);
 
         $tieneParametrosCalidad = $agua > 0 || $ph > 0 || $densidad !== null
             || ! empty($validated['grasa']) || ! empty($validated['proteina']);
@@ -179,64 +176,8 @@ class AcopioApiController extends Controller
             $acopio->update(['foto_evidencia' => $ruta]);
         }
 
-        // ── REGLA 3: Sistema de 2-strikes ─────────────────────────────────────
-        $mensaje2Strikes = null;
-
-        if ($esAdulterado) {
-            [$inicioCiclo, $finCiclo] = Acopio::rangoSemanaLiquidacion();
-
-            // Contar adulteraciones del ganadero en la semana activa
-            $strikesEnSemana = Acopio::where('ganadero_id', $ganadero->id)
-                                     ->whereIn('estado', ['rechazado', 'observado'])
-                                     ->whereBetween('fecha', [$inicioCiclo, $finCiclo])
-                                     ->count();
-
-            if ($strikesEnSemana >= 2) {
-                // 2 strikes alcanzados → suspender al ganadero
-                $ganadero->suspender();
-
-                $mensaje2Strikes = "⚠️ SUSPENDIDO: {$ganadero->nombre} acumuló {$strikesEnSemana} "
-                    . "adulteraciones esta semana y ha sido bloqueado automáticamente.";
-
-                // Notificar al administrador (user id 1 = admin por convención)
-                try {
-                    $adminId = \App\Models\User::where('rol', 'admin')
-                                               ->where('activo', true)
-                                               ->value('id') ?? 1;
-
-                    Notificacion::enviar(
-                        userId:       $adminId,
-                        titulo:       "🚫 Proveedor suspendido: {$ganadero->nombre}",
-                        mensaje:      "El proveedor {$ganadero->nombre} (DNI: {$ganadero->dni}) "
-                                    . "alcanzó 2 adulteraciones en la semana {$inicioCiclo} → {$finCiclo}. "
-                                    . "Ha sido suspendido automáticamente. Revise en el panel.",
-                        tipo:         'suspension',
-                        referenciaId: $ganadero->id,
-                    );
-                } catch (\Throwable) {
-                    // No interrumpir el flujo si falla la notificación
-                }
-            } elseif ($strikesEnSemana === 1) {
-                // Primer strike — advertencia al admin
-                $mensaje2Strikes = "⚠️ Primer strike: {$ganadero->nombre} tiene 1 adulteración esta semana. "
-                    . "Una más y será suspendido.";
-
-                try {
-                    $adminId = \App\Models\User::where('rol', 'admin')
-                                               ->where('activo', true)
-                                               ->value('id') ?? 1;
-
-                    Notificacion::enviar(
-                        userId:       $adminId,
-                        titulo:       "⚠️ Strike 1/2: {$ganadero->nombre}",
-                        mensaje:      "El proveedor {$ganadero->nombre} tiene su primer strike por adulteración "
-                                    . "esta semana. Una adulteración más resultará en suspensión automática.",
-                        tipo:         'adulteracion_exceso',
-                        referenciaId: $ganadero->id,
-                    );
-                } catch (\Throwable) { }
-            }
-        }
+        // ── REGLA 3: Sistema de 2-strikes (aviso y suspensión) ────────────────
+        $mensaje2Strikes = app(\App\Services\AdulteracionService::class)->evaluar($acopio);
 
         // ── Construir respuesta ───────────────────────────────────────────────
         $responseData = [

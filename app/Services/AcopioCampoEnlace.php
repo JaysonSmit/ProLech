@@ -15,6 +15,10 @@ use App\Models\Liquidacion;
  */
 class AcopioCampoEnlace
 {
+    public function __construct(private AdulteracionService $adulteracion)
+    {
+    }
+
     public function sincronizar(AcopioCampo $campo): ?Acopio
     {
         // Ganadero que ya no existe en la planta: no hay a quién liquidarle
@@ -38,7 +42,12 @@ class AcopioCampoEnlace
 
         $acopio = Acopio::where('acopio_campo_id', $campo->id)->first();
         if ($acopio) {
+            $estadoAntes = $acopio->estado;
             $acopio->update($datos);
+            // Solo cuenta como strike si al editarlo pasó de aprobado a adulterado
+            if ($estadoAntes === 'aprobado') {
+                $this->adulteracion->evaluar($acopio);
+            }
             return $acopio;
         }
 
@@ -50,6 +59,7 @@ class AcopioCampoEnlace
         ]);
         $acopio->created_at = $registrado;   // la hora real del acopio, no la de la sincronización
         $acopio->save();
+        $this->adulteracion->evaluar($acopio);   // regla de 2 strikes, igual que la app clásica
 
         return $acopio;
     }
