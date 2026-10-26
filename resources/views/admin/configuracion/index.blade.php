@@ -112,6 +112,15 @@
                            value="{{ $config->get('precio_queso_publico')?->valor ?? '21.00' }}"
                            class="form-control" required>
                 </div>
+
+                <div class="form-group">
+                    <label class="form-label">Margen de ganancia objetivo (%) — tienda</label>
+                    <input type="number" step="1" min="0" max="300"
+                           name="margen_ganancia_pct"
+                           value="{{ $config->get('margen_ganancia_pct')?->valor ?? '30' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Se usa para sugerir el precio de cada producto: costo de la receta × (1 + margen).</small>
+                </div>
             </div>
         </div>
 

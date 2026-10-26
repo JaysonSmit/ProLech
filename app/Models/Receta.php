@@ -53,6 +53,32 @@ class Receta extends Model
      *
      * @return array<int, array{insumo: Insumo, cantidad_necesaria: float}>
      */
+    /** Costo de los insumos de UNA unidad (receta ÷ rendimiento), con los costos actuales del inventario. */
+    public function costoUnitario(): float
+    {
+        $total = $this->detalles->sum(fn ($d) => (float) $d->cantidad_requerida * (float) ($d->insumo->costo_unitario ?? 0));
+        return round($total / max(1, (int) $this->rendimiento_esperado_unidades), 2);
+    }
+
+    /** Margen de ganancia objetivo (%) configurable en Configuración; 30 % por defecto. */
+    public static function margenObjetivo(): float
+    {
+        return (float) Configuracion::get('margen_ganancia_pct', 30);
+    }
+
+    /** Precio sugerido = costo × (1 + margen), redondeado hacia arriba a S/ 0.50. */
+    public function precioSugerido(?float $margen = null): float
+    {
+        $precio = $this->costoUnitario() * (1 + ($margen ?? self::margenObjetivo()) / 100);
+        return max(0.5, ceil($precio * 2) / 2);
+    }
+
+    /** Margen (%) de un precio de venta sobre el costo; null si el precio no es válido. */
+    public function margenDe(float $precio): ?float
+    {
+        return $precio > 0 ? round(($precio - $this->costoUnitario()) / $precio * 100, 1) : null;
+    }
+
     public function calcularInsumos(int $unidades): array
     {
         $resultado = [];

@@ -24,8 +24,10 @@ class RecetaController extends Controller
         $publicadasIds = ProductoTienda::whereNotNull('receta_id')
             ->pluck('id', 'receta_id')
             ->all();
+        $preciosTienda = ProductoTienda::whereNotNull('receta_id')->pluck('precio_venta', 'receta_id')->all();
+        $margenObjetivo = Receta::margenObjetivo();
 
-        return view('admin.recetas.index', compact('recetas', 'publicadasIds'));
+        return view('admin.recetas.index', compact('recetas', 'publicadasIds', 'preciosTienda', 'margenObjetivo'));
     }
 
     // ── POST /admin/recetas/publicar ──────────────────────────────────────────

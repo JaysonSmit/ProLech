@@ -35,7 +35,9 @@ class AdminTiendaController extends Controller
     /** GET /admin/tienda/productos/create */
     public function productosCreate(): View
     {
-        $recetas = Receta::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
+        // Con costo y precio sugerido para la ayuda del formulario
+        $recetas = Receta::where('activa', true)->with('detalles.insumo')->orderBy('nombre')->get()
+            ->each(fn (Receta $r) => $r->setAttribute('costo', $r->costoUnitario())->setAttribute('sugerido', $r->precioSugerido()));
 
         return view('admin.tienda.productos.create', compact('recetas'));
     }
@@ -76,7 +78,11 @@ class AdminTiendaController extends Controller
     /** GET /admin/tienda/productos/{producto}/edit */
     public function productosEdit(ProductoTienda $producto): View
     {
-        $recetas = Receta::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
+        $recetas = Receta::where('activa', true)->with('detalles.insumo')->orderBy('nombre')->get()
+            ->each(function (Receta $r) {
+                $r->setAttribute('costo', $r->costoUnitario());
+                $r->setAttribute('sugerido', $r->precioSugerido());
+            });
 
         return view('admin.tienda.productos.edit', compact('producto', 'recetas'));
     }

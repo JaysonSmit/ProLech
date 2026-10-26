@@ -38,7 +38,34 @@
                value="{{ old('precio_venta', $producto?->precio_venta) }}"
                required placeholder="0.00">
         @error('precio_venta')<span style="color:var(--red); font-size:.78rem;">{{ $message }}</span>@enderror
+        <div id="ayuda-precio" style="font-size:.78rem;margin-top:6px;font-weight:600"></div>
+        <button type="button" id="usar-sugerido" style="display:none;margin-top:6px;padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg);cursor:pointer;font-size:.76rem"></button>
     </div>
+    @if(isset($recetas) && $recetas->first()?->costo !== null)
+    <script>
+    (function () {
+        // Costo por unidad de cada receta (insumos actuales) y precio sugerido con el margen objetivo
+        const COSTOS = @json($recetas->mapWithKeys(fn ($r) => [$r->id => ['costo' => $r->costo, 'sugerido' => $r->sugerido]]));
+        const precio = document.getElementById('precio_venta');
+        const receta = () => document.getElementById('receta_id');   // está más abajo en el formulario
+        const ayuda = document.getElementById('ayuda-precio'), boton = document.getElementById('usar-sugerido');
+        function pintar() {
+            const c = COSTOS[receta()?.value];
+            if (!c) { ayuda.textContent = ''; boton.style.display = 'none'; return; }
+            const p = parseFloat(precio.value);
+            boton.style.display = 'inline-block';
+            boton.textContent = `Usar precio sugerido: S/ ${Number(c.sugerido).toFixed(2)}`;
+            if (!p) { ayuda.style.color = 'var(--text-muted)'; ayuda.textContent = `Costo por unidad: S/ ${Number(c.costo).toFixed(2)}`; return; }
+            const m = (p - c.costo) / p * 100;
+            ayuda.style.color = m < 10 ? '#dc2626' : (m < 20 ? '#d97706' : '#15803d');
+            ayuda.textContent = `Costo S/ ${Number(c.costo).toFixed(2)} · ganancia S/ ${(p - c.costo).toFixed(2)} · margen ${m.toFixed(1)} %` + (m < 0 ? ' — ¡por debajo del costo!' : '');
+        }
+        boton.addEventListener('click', () => { precio.value = Number(COSTOS[receta().value].sugerido).toFixed(2); pintar(); });
+        precio.addEventListener('input', pintar);
+        document.addEventListener('DOMContentLoaded', () => { document.getElementById('receta_id')?.addEventListener('change', pintar); pintar(); });
+    })();
+    </script>
+    @endif
 
     {{-- Stock --}}
     <div class="form-group">

@@ -31,6 +31,7 @@ class ConfiguracionController extends Controller
             'precio_queso_mayorista'    => ['required', 'numeric', 'min:0.01', 'max:999.99'],
             'precio_queso_proveedor'    => ['required', 'numeric', 'min:0.01', 'max:999.99'],
             'precio_queso_publico'      => ['required', 'numeric', 'min:0.01', 'max:999.99'],
+            'margen_ganancia_pct'       => ['nullable', 'numeric', 'min:0', 'max:300'],
             'temporada_activa'          => ['required', 'in:normal,lluvias'],
             'agua_limite_retiro'        => ['required', 'numeric', 'min:1', 'max:50'],
             'descuento_litro_leve'      => ['required', 'numeric', 'min:0.01', 'max:5'],
@@ -38,6 +39,7 @@ class ConfiguracionController extends Controller
             'stock_minimo_venta_directa'=> ['required', 'integer', 'min:0', 'max:1000'],
         ]);
 
+        $validated['margen_ganancia_pct'] = $validated['margen_ganancia_pct'] ?? 30;
         foreach ($validated as $clave => $valor) {
             Configuracion::set($clave, $valor);
         }
