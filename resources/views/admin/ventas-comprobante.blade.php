@@ -121,7 +121,7 @@
 
         @if($venta->anulada)
             <div class="anulada-nota">
-                <strong>Venta anulada</strong> el {{ $venta->anulada_at->timezone('America/Lima')->format('d/m/Y H:i') }}
+                <strong>Venta anulada</strong> el {{ $venta->anulada_at->format('d/m/Y H:i') }}
                 por {{ $venta->anulador?->name ?? '—' }}. Motivo: {{ $venta->motivo_anulacion }}
             </div>
         @else
@@ -133,7 +133,7 @@
 
         <div class="pie">
             <div>Documento interno de control. No es un comprobante de pago electrónico (SUNAT).</div>
-            <div>Emitido {{ now('America/Lima')->format('d/m/Y H:i') }}</div>
+            <div>Emitido {{ now()->format('d/m/Y H:i') }}</div>
         </div>
     </div>
 </body>
