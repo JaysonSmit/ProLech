@@ -402,7 +402,11 @@ class ProlechDemoSeeder extends Seeder
             if (! $yaProducida && $receta->detalles()->exists()) {
                 try {
                     $lote = $produccion->registrarLote($receta->id, $unidades, $responsable, 'demo: lote de la semana');
-                    $lote->update(['fecha_produccion' => now()->subDays(mt_rand(1, 4))->toDateString()]);
+                    $fecha = now()->subDays(mt_rand(1, 4))->toDateString();
+                    $lote->update([
+                        'fecha_produccion'  => $fecha,
+                        'fecha_vencimiento' => \App\Services\StockLotes::fechaVencimiento($fecha, (int) ($receta->dias_vida_util ?: 15)),
+                    ]);
                 } catch (\RuntimeException $e) {
                     $this->command?->warn("   ⚠ {$nombreReceta}: {$e->getMessage()}");
                 }

@@ -16,7 +16,9 @@ class ProduccionLote extends Model
         'orden_codigo',
         'receta_id',
         'fecha_produccion',
+        'fecha_vencimiento',
         'cantidad_producida',
+        'merma',
         'costo_total',
         'responsable_id',
         'observaciones',
@@ -24,6 +26,8 @@ class ProduccionLote extends Model
 
     protected $casts = [
         'fecha_produccion'  => 'date',
+        'fecha_vencimiento' => 'date',
+        'merma'             => 'integer',
         'cantidad_producida' => 'integer',
         'costo_total'       => 'decimal:2',
     ];
@@ -49,6 +53,19 @@ class ProduccionLote extends Model
     }
 
     // ── Helpers / Accessors ────────────────────────────────────────────────────
+
+    /** Días que faltan para el vencimiento (negativo si ya venció). */
+    public function diasParaVencer(): ?int
+    {
+        return $this->fecha_vencimiento ? (int) now()->startOfDay()->diffInDays($this->fecha_vencimiento, false) : null;
+    }
+
+    /** vigente · por_vencer (≤ 3 días) · vencido */
+    public function estadoVencimiento(): string
+    {
+        $dias = $this->diasParaVencer();
+        return $dias === null ? 'vigente' : ($dias < 0 ? 'vencido' : ($dias <= \App\Services\StockLotes::DIAS_AVISO ? 'por_vencer' : 'vigente'));
+    }
 
     /** Costo por unidad producida. */
     public function getCostoPorUnidadAttribute(): float

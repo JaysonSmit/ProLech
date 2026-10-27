@@ -8,6 +8,20 @@
 {{-- ══════════════════════════════════════════════════════════════════════
      FLASH MESSAGES
 ══════════════════════════════════════════════════════════════════════ --}}
+@if(isset($porVencer) && $porVencer->isNotEmpty())
+<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:14px;padding:14px 18px;margin-bottom:16px">
+    <div style="font-weight:800;color:#92400e;margin-bottom:6px">⏰ Productos por vencer en la tienda</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+        @foreach($porVencer as $f)
+        <span style="background:#fff;border:1px solid #fde68a;border-radius:10px;padding:6px 10px;font-size:.8rem">
+            <strong>{{ $f['producto']->nombre }}</strong> · {{ $f['en_stock'] }} und. · lote {{ $f['lote']->codigo_lote }} ·
+            <span style="color:{{ $f['estado'] === 'vencido' ? '#b91c1c' : '#b45309' }};font-weight:700">{{ $f['estado'] === 'vencido' ? 'vencido' : ($f['dias'] === 0 ? 'vence hoy' : 'vence en '.$f['dias'].' días') }}</span>
+        </span>
+        @endforeach
+    </div>
+    <div style="font-size:.75rem;color:#92400e;margin-top:6px">Véndelos primero (ofertas en tienda o en planta). Lo vencido se retira solo cada mañana como merma.</div>
+</div>
+@endif
 @if(session('success'))
 <div id="msg-ok" style="display:flex;align-items:center;gap:12px;padding:14px 18px;
     margin-bottom:20px;background:#dcfce7;border:1px solid #86efac;border-radius:10px;
@@ -312,7 +326,9 @@
                         <th>Código</th>
                         <th>Producto</th>
                         <th>Fecha</th>
+                        <th>Vence</th>
                         <th style="text-align:center">Unidades</th>
+                        <th style="text-align:center">En tienda</th>
                         <th>Costo total</th>
                         <th>Costo / und.</th>
                         <th>Responsable</th>
@@ -341,9 +357,26 @@
                                 {{ $lote->fecha_produccion->isoFormat('dddd') }}
                             </div>
                         </td>
+                        <td style="white-space:nowrap;font-size:.82rem">
+                            @php $dias = $lote->diasParaVencer(); $est = $lote->estadoVencimiento(); @endphp
+                            @if($lote->fecha_vencimiento)
+                                {{ $lote->fecha_vencimiento->format('d/m/Y') }}
+                                <div>
+                                    <span style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:10px;
+                                        background:{{ $est === 'vencido' ? '#fee2e2' : ($est === 'por_vencer' ? '#fef3c7' : '#dcfce7') }};
+                                        color:{{ $est === 'vencido' ? '#b91c1c' : ($est === 'por_vencer' ? '#b45309' : '#15803d') }}">
+                                        {{ $est === 'vencido' ? 'Vencido' : ($dias === 0 ? 'Vence hoy' : "Faltan {$dias} días") }}
+                                    </span>
+                                </div>
+                            @else — @endif
+                        </td>
                         <td style="font-weight:800;text-align:center;
                                    font-size:1rem;color:var(--text)">
                             {{ number_format($lote->cantidad_producida) }}
+                            @if($lote->merma)<div style="font-size:.68rem;color:#b91c1c;font-weight:600">−{{ $lote->merma }} merma</div>@endif
+                        </td>
+                        <td style="text-align:center;font-weight:700;color:var(--brand)">
+                            {{ $enTienda[$lote->id] ?? 0 }}
                         </td>
                         <td>
                             <strong style="color:var(--amber)">

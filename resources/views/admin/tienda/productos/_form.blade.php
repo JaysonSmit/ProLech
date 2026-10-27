@@ -45,11 +45,20 @@
     <script>
     (function () {
         // Costo por unidad de cada receta (insumos actuales) y precio sugerido con el margen objetivo
-        const COSTOS = @json($recetas->mapWithKeys(fn ($r) => [$r->id => ['costo' => $r->costo, 'sugerido' => $r->sugerido]]));
+        const COSTOS = @json($recetas->mapWithKeys(fn ($r) => [$r->id => ['costo' => $r->costo, 'sugerido' => $r->sugerido, 'producido' => $r->producido]]));
         const precio = document.getElementById('precio_venta');
         const receta = () => document.getElementById('receta_id');   // está más abajo en el formulario
         const ayuda = document.getElementById('ayuda-precio'), boton = document.getElementById('usar-sugerido');
+        function pintarStock() {
+            const c = COSTOS[receta()?.value], ayudaStock = document.getElementById('ayuda-stock');
+            const stock = document.getElementById('stock_disponible');
+            if (!ayudaStock || !stock || stock.required) return;   // al editar el stock ya es el real
+            ayudaStock.textContent = c && c.producido !== undefined
+                ? `🏭 Producido y vigente de esta receta: ${c.producido} und. Si lo dejas vacío, entra ese stock.`
+                : '💡 Déjalo vacío: si eliges una receta, entra lo producido que sigue vigente.';
+        }
         function pintar() {
+            pintarStock();
             const c = COSTOS[receta()?.value];
             if (!c) { ayuda.textContent = ''; boton.style.display = 'none'; return; }
             const p = parseFloat(precio.value);
@@ -69,14 +78,26 @@
 
     {{-- Stock --}}
     <div class="form-group">
-        <label for="stock_disponible">Stock Inicial (uds.) <span class="req">*</span></label>
+        <label for="stock_disponible">{{ $producto ? 'Stock actual (uds.)' : 'Stock inicial (uds.)' }}</label>
         <input type="number" id="stock_disponible" name="stock_disponible"
                min="0" step="1"
-               value="{{ old('stock_disponible', $producto?->stock_disponible ?? 0) }}"
-               required>
-        <span style="color:var(--text-muted); font-size:.75rem;">
-            💡 El stock aumenta automáticamente al cerrar un Lote de Producción.
+               value="{{ old('stock_disponible', $producto?->stock_disponible) }}"
+               placeholder="{{ $producto ? '' : 'Automático desde la producción' }}"
+               {{ $producto ? 'required' : '' }}>
+        <span style="color:var(--text-muted); font-size:.75rem;" id="ayuda-stock">
+            💡 {{ $producto ? 'Sube solo al registrar producción y baja con cada venta.' : 'Déjalo vacío: si eliges una receta, entra lo producido que sigue vigente.' }}
         </span>
+        @if(!empty($desglose) && $desglose->isNotEmpty())
+        <div style="margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:.78rem">
+            <div style="font-weight:700;margin-bottom:4px">Por lote (sale primero lo que vence antes)</div>
+            @foreach($desglose as $f)
+            <div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0">
+                <span>{{ $f['lote']->codigo_lote }} · vence {{ $f['lote']->fecha_vencimiento?->format('d/m/Y') }}</span>
+                <strong style="color:{{ $f['estado'] === 'vencido' ? '#b91c1c' : ($f['estado'] === 'por_vencer' ? '#b45309' : 'inherit') }}">{{ $f['en_stock'] }} und.</strong>
+            </div>
+            @endforeach
+        </div>
+        @endif
         @error('stock_disponible')<span style="color:var(--red); font-size:.78rem;">{{ $message }}</span>@enderror
     </div>
 

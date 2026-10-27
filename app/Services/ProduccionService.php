@@ -161,6 +161,8 @@ class ProduccionService
                 'codigo_lote'        => $codigoLote,
                 'receta_id'          => $receta->id,
                 'fecha_produccion'   => $fechaHoy,
+                // Vence según la vida útil de la receta (Queso Fresco 7 días, Paria 30…)
+                'fecha_vencimiento'  => StockLotes::fechaVencimiento($fechaHoy, (int) ($receta->dias_vida_util ?: 15)),
                 'cantidad_producida' => $cantidadProducida,
                 'costo_total'        => round($costoTotal, 2),
                 'responsable_id'     => $responsable->id,

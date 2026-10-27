@@ -14,12 +14,14 @@ class Receta extends Model
     protected $fillable = [
         'nombre',
         'rendimiento_esperado_unidades',
+        'dias_vida_util',
         'descripcion',
         'activa',
     ];
 
     protected $casts = [
         'rendimiento_esperado_unidades' => 'integer',
+        'dias_vida_util'                => 'integer',
         'activa'                        => 'boolean',
     ];
 

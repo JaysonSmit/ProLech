@@ -63,7 +63,8 @@ class RecetaController extends Controller
             'nombre'           => $receta->nombre,
             'descripcion'      => $request->descripcion ?: $receta->descripcion,
             'precio_venta'     => $request->precio_venta,
-            'stock_disponible' => 0,
+            // Lo ya producido de esta receta (lotes vigentes) entra directo al stock
+            'stock_disponible' => app(\App\Services\StockLotes::class)->disponibleProducido($receta->id),
             'imagen_url'       => $imagenUrl,
             'estado'           => 'activo',
             'receta_id'        => $receta->id,
@@ -99,6 +100,7 @@ class RecetaController extends Controller
                 $receta = Receta::create([
                     'nombre'                        => $validated['nombre'],
                     'rendimiento_esperado_unidades' => $validated['rendimiento_esperado_unidades'],
+                    'dias_vida_util'                => $validated['dias_vida_util'] ?? 15,
                     'descripcion'                   => $validated['descripcion'] ?? null,
                     'activa'                        => true,
                 ]);
@@ -142,6 +144,7 @@ class RecetaController extends Controller
                 $receta->update([
                     'nombre'                        => $validated['nombre'],
                     'rendimiento_esperado_unidades' => $validated['rendimiento_esperado_unidades'],
+                    'dias_vida_util'                => $validated['dias_vida_util'] ?? 15,
                     'descripcion'                   => $validated['descripcion'] ?? null,
                 ]);
 
@@ -180,6 +183,7 @@ class RecetaController extends Controller
                     ->ignore($ignorarId),
             ],
             'rendimiento_esperado_unidades' => ['required', 'integer', 'min:1', 'max:99999'],
+            'dias_vida_util'                => ['nullable', 'integer', 'min:1', 'max:3650'],
             'descripcion'                   => ['nullable', 'string', 'max:1000'],
 
             // Detalle de ingredientes

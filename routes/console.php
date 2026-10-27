@@ -37,3 +37,6 @@ Schedule::command('queue:prune-failed --hours=720')->dailyAt('03:20');
 
 // Aviso de insumos en stock mínimo antes del turno de producción
 Schedule::command('prolech:alertas-stock')->dailyAt('06:30');
+
+// Productos de lotes vencidos: se retiran de la tienda como merma antes de abrir
+Schedule::command('prolech:retirar-vencidos')->dailyAt('06:35');
