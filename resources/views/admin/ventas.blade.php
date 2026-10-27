@@ -5,97 +5,14 @@
 
 @section('content')
 
-{{-- ── Tarifas y Métricas de Stock y Despacho ─────────────────────────────────── --}}
-<div class="info-boxes" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:14px;margin-bottom:20px">
-    <div class="info-box">
-        <div class="ib-label">Tarifa Mayorista</div>
-        <div class="ib-value">
-            <span class="precio-tag">S/ {{ number_format($precios['mayorista'], 2) }} / kg</span>
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Destinos regionales</div>
-    </div>
-
-    <div class="info-box">
-        <div class="ib-label">Tarifa Público General</div>
-        <div class="ib-value">
-            <span class="precio-tag">S/ {{ number_format($precios['publico'], 2) }} / kg</span>
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">Venta directa planta</div>
-    </div>
-
-    <div class="info-box" style="border-left: 4px solid {{ $alertaStockQuesos ? 'var(--red)' : 'var(--green)' }}">
-        <div class="ib-label">Stock Quesos Planta</div>
-        <div class="ib-value" style="color:{{ $alertaStockQuesos ? 'var(--red)' : 'var(--green)' }}">
-            {{ number_format($stockActualQuesos, 1) }} moldes
-        </div>
-        <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px">
-            Reserva mín: {{ $stockMinimoQuesos }} moldes
-            @if($alertaStockQuesos)
-                <span style="color:var(--red);font-weight:700">· ⚠️ Stock crítico</span>
-            @endif
-        </div>
-    </div>
-
-    <div class="info-box" style="border-left: 4px solid #f59e0b">
-        <div class="ib-label">En Preparación</div>
-        <div class="ib-value" style="color:#d97706">
-            {{ $despachosPendientes }}
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">📦 Lotes por embalar</div>
-    </div>
-
-    <div class="info-box" style="border-left: 4px solid #3b82f6">
-        <div class="ib-label">En Camino</div>
-        <div class="ib-value" style="color:#2563eb">
-            {{ $despachosEnCamino }}
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">🚚 En ruta a destino</div>
-    </div>
-
-    <div class="info-box" style="border-left: 4px solid #10b981">
-        <div class="ib-label">Entregados</div>
-        <div class="ib-value" style="color:#059669">
-            {{ $despachosEntregados }}
-        </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">✅ Conforme en destino</div>
-    </div>
-</div>
-
-{{-- ── Resumen de Distribución por Mercado Destino ─────────────────────────────── --}}
-@if($resumenDestino->isNotEmpty())
-<div class="card" style="margin-bottom:24px">
-    <div class="card-header">
-        <h3>📍 Distribución por Mercados de Destino</h3>
-        <span class="card-header-meta">Resumen de volumen y facturación regional</span>
-    </div>
-    <div class="card-body" style="padding:16px 20px">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:14px">
-            @foreach($resumenDestino as $dest)
-            <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px 14px">
-                <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:flex;align-items:center;gap:4px">
-                    <span>📍</span> {{ $dest->destino ?: 'Planta / Local' }}
-                </div>
-                <div style="font-size:1.3rem;font-weight:800;color:var(--text);margin-top:4px">
-                    {{ number_format($dest->total_kg, 1) }} <span style="font-size:.8rem;font-weight:500">kg</span>
-                </div>
-                <div style="font-size:.85rem;color:var(--green);font-weight:700;margin-top:2px">
-                    S/ {{ number_format($dest->total_monto, 2) }}
-                </div>
-                <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
-                    {{ $dest->num_envios }} despacho(s)
-                </div>
-            </div>
-            @endforeach
-        </div>
-    </div>
-</div>
-@endif
+@include('admin.ventas._dashboard')
 
 {{-- ── Formulario nueva venta y despacho ─────────────────────────────────────── --}}
-<div class="card" style="margin-bottom:24px">
-    <div class="card-header">
-        <h3>➕ Registrar Nueva Venta y Programar Despacho</h3>
-    </div>
+<details id="nueva-venta" class="card" style="margin-bottom:24px" {{ $errors->hasAny(['cliente','tipo_cliente','destino','fecha_venta','lineas','lineas.*']) ? 'open' : '' }}>
+    <summary class="card-header" style="cursor:pointer;list-style:none">
+        <h3>➕ Registrar nueva venta y programar despacho</h3>
+        <span class="card-header-meta">Toca para abrir o cerrar</span>
+    </summary>
     <div class="card-body">
         @if($alertaStockQuesos)
         <div style="margin-bottom:18px;padding:12px 16px;background:var(--red-bg);border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:.85rem;display:flex;align-items:center;gap:10px">
@@ -269,10 +186,10 @@
             </div>
         </form>
     </div>
-</div>
+</details>
 
 {{-- ── Historial de ventas y despachos con filtros ──────────────────────────── --}}
-<div class="card">
+<div class="card" id="historial-ventas">
     <div class="card-header" style="flex-wrap:wrap;gap:12px">
         <div>
             <h3>📋 Historial de Ventas y Despachos</h3>

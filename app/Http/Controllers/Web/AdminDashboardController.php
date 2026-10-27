@@ -216,9 +216,10 @@ class AdminDashboardController extends Controller
         $alertaStockQuesos = Produccion::alertaStockMinimo();
 
         $catalogo = app(\App\Services\VentaService::class)->catalogo();
+        $dashboard = app(\App\Services\VentasDashboard::class)->datos();
 
         return view('admin.ventas', compact(
-            'ventas', 'catalogo', 'resumenMes', 'resumenDestino', 'precios',
+            'ventas', 'catalogo', 'resumenMes', 'resumenDestino', 'precios', 'dashboard',
             'stockActualQuesos', 'stockMinimoQuesos', 'alertaStockQuesos',
             'despachosPendientes', 'despachosEnCamino', 'despachosEntregados',
             'destinoFiltro', 'despachoFiltro'
