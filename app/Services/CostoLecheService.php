@@ -53,13 +53,15 @@ class CostoLecheService
         if ($litros <= 0) return null;
 
         // 1. Precio promedio pagado al ganadero (liquidaciones de semanas dentro de la ventana)
+        //    = Σ total pagado ÷ Σ litros recibidos (no rechazados) en esas mismas semanas
         $liq = Liquidacion::whereDate('semana_inicio', '>=', $desde->copy()->subDays(6))->whereDate('semana_inicio', '<=', $hasta)
-            ->selectRaw('COALESCE(SUM(subtotal_normal + subtotal_penalidad),0) pagado, COALESCE(SUM(litros_aprobados + litros_adulterados),0) litros')
-            ->first();
-        $base = (float) $liq->litros > 0
-            ? (float) $liq->pagado / (float) $liq->litros
+            ->selectRaw('COALESCE(SUM(total_bruto),0) pagado, MIN(semana_inicio) ini, MAX(semana_fin) fin')->first();
+        $litrosLiquidados = $liq->ini ? (float) Acopio::whereDate('fecha', '>=', $liq->ini)->whereDate('fecha', '<=', $liq->fin)
+            ->where('estado', '!=', 'rechazado')->sum('litros') : 0.0;
+        $base = $litrosLiquidados > 0 && (float) $liq->pagado > 0
+            ? (float) $liq->pagado / $litrosLiquidados
             : Configuracion::precioLitroActual();
-        $fuenteBase = (float) $liq->litros > 0 ? 'liquidaciones' : 'precio configurado';
+        $fuenteBase = $litrosLiquidados > 0 && (float) $liq->pagado > 0 ? 'liquidaciones' : 'precio configurado';
 
         // 2. Logística: combustible + pago a choferes del mismo periodo
         $planillas = app(PlanillaChoferService::class);
