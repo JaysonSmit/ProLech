@@ -60,11 +60,13 @@ class RutaChoferService
         }
 
         $ganaderos = $query
-            ->select('id', 'dni', 'nombre', 'direccion', 'ruta_asignada', 'estado', 'geo_lat', 'geo_lon', 'zona_id')
+            ->select('id', 'dni', 'nombre', 'direccion', 'ruta_asignada', 'estado', 'geo_lat', 'geo_lon', 'zona_id', 'entregas_bloqueadas', 'bloqueo_motivo')
             ->orderBy('nombre')
             ->get();
 
         $atendidos = $this->atendidosHoy($chofer->id);
+        $muestras  = \App\Models\ControlCalidad::where('tipo', 'muestra')->where('estado', 'programado')
+            ->whereDate('fecha', $hoy)->whereIn('ganadero_id', $ganaderos->pluck('id'))->pluck('frasco_codigo', 'ganadero_id');
         $planta    = $this->planta();
         $ordenados = $zona?->tieneTrazado()
             ? self::ordenarPorTrazado($ganaderos, $zona)
@@ -81,6 +83,11 @@ class RutaChoferService
             'geo_lon'         => $g->geo_lon !== null ? (float) $g->geo_lon : null,
             'atendido'        => $atendidos->contains($g->id),
             'suspendido'      => strcasecmp((string) $g->estado, 'Suspendido') === 0,
+            // Sanción de calidad: entregas que aún no puede hacer
+            'bloqueado'       => (int) $g->entregas_bloqueadas,
+            'bloqueo_motivo'  => $g->bloqueo_motivo,
+            // Control sorpresa: el chofer se entera recién al registrar la entrega
+            'muestra'         => $muestras[$g->id] ?? null,
         ]);
 
         return [

@@ -488,7 +488,7 @@ class OperacionesController extends Controller
 
         $clasicos = Acopio::with('ganadero:id,nombre,dni,zona_id')
             ->whereNull('acopio_campo_id')   // los de campo se suman abajo
-            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+            ->whereDate('fecha', '>=', $desde)->whereDate('fecha', '<=', $hasta)
             ->get()
             ->map(fn ($a) => [
                 'Fecha'      => Carbon::parse($a->fecha)->format('d/m/Y'),

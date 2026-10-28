@@ -903,6 +903,11 @@
 
         @if($webUser->seccionWebPermitida('calidad_plan') && Route::has('admin.calidad.plan.index'))
         <div class="nav-section" style="margin-top:8px">Calidad</div>
+        <a href="{{ route('admin.calidad.control.index') }}"
+           class="nav-link {{ request()->routeIs('admin.calidad.control*') ? 'active' : '' }}">
+            <span class="nav-icon">🧪</span>
+            <span>Control sorpresa</span>
+        </a>
         <a href="{{ route('admin.calidad.plan.index') }}"
            class="nav-link {{ request()->routeIs('admin.calidad.plan*') ? 'active' : '' }}"
            style="border-left:3px solid #ffc107">

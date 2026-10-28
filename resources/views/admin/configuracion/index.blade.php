@@ -121,6 +121,15 @@
                            class="form-control">
                     <small style="color:var(--text-muted)">Se usa para sugerir el precio de cada producto: costo de la receta × (1 + margen).</small>
                 </div>
+
+                <div class="form-group">
+                    <label class="form-label">Controles de calidad sorpresa por día</label>
+                    <input type="number" step="1" min="0" max="50"
+                           name="controles_por_dia"
+                           value="{{ $config->get('controles_por_dia')?->valor ?? '3' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">El sistema los sortea cada madrugada (1 de cada 3 en el predio, el resto en frasco que trae el chofer), más el tanque de cada camión.</small>
+                </div>
             </div>
         </div>
 

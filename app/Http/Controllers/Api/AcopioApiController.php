@@ -121,6 +121,14 @@ class AcopioApiController extends Controller
             ], 403);
         }
 
+        if ($ganadero->entregas_bloqueadas > 0) {
+            return response()->json([
+                'message' => "Ganadero bloqueado por calidad: le faltan {$ganadero->entregas_bloqueadas} entrega(s) para volver a entregar.",
+                'codigo'  => 'GANADERO_BLOQUEADO',
+                'ganadero'=> $ganadero->nombre,
+            ], 403);
+        }
+
         // ── REGLA 2: Sin duplicado en el mismo día ────────────────────────────
         $yaEntrego = Acopio::where('ganadero_id', $validated['ganadero_id'])
                            ->where('fecha', $validated['fecha'])

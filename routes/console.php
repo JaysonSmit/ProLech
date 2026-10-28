@@ -40,3 +40,8 @@ Schedule::command('prolech:alertas-stock')->dailyAt('06:30');
 
 // Productos de lotes vencidos: se retiran de la tienda como merma antes de abrir
 Schedule::command('prolech:retirar-vencidos')->dailyAt('06:35');
+
+// Control de calidad sorpresa: sorteo antes de que salgan los camiones y, de noche,
+// una entrega menos a los ganaderos bloqueados cuyo camión pasó por su ruta
+Schedule::command('prolech:calidad sortear')->dailyAt('04:30');
+Schedule::command('prolech:calidad bloqueos')->dailyAt('23:30');

@@ -253,6 +253,16 @@ Route::middleware(['auth', 'rol:admin,calidad', '2fa'])
     Route::middleware('seccion:calidad_plan')->group(function () {
         Route::post('calidad/plan', [PlanCalidadController::class, 'store'])->name('calidad.plan.store');
         Route::post('calidad/plan/{plan}/ejecutado', [PlanCalidadController::class, 'marcarEjecutado'])->name('calidad.plan.ejecutado');
+
+        // Control de calidad sorpresa (confidencial: los choferes no ven esta sección)
+        Route::controller(\App\Http\Controllers\Web\ControlSorpresaController::class)->group(function () {
+            Route::get('calidad/control', 'index')->name('calidad.control.index');
+            Route::post('calidad/control/sortear', 'sortear')->name('calidad.control.sortear');
+            Route::post('calidad/control/programar', 'programar')->name('calidad.control.programar');
+            Route::post('calidad/control/{control}/resultado', 'resultado')->name('calidad.control.resultado');
+            Route::post('calidad/control/{control}/cancelar', 'cancelar')->name('calidad.control.cancelar');
+            Route::post('calidad/control/ganadero/{ganadero}/desbloquear', 'desbloquear')->name('calidad.control.desbloquear');
+        });
     });
     Route::middleware('seccion:calidad_planta')->group(function () {
         Route::post('calidad/planta', [CalidadPlantaController::class, 'store'])->name('calidad.planta.store');

@@ -51,7 +51,7 @@ class PortalProveedorController extends Controller
         $semanaFin    = Liquidacion::finSemana($semanaInicio);
 
         $acopiosSemana = Acopio::where('ganadero_id', $ganadero->id)
-            ->whereBetween('fecha', [$semanaInicio->toDateString(), $semanaFin->toDateString()])
+            ->whereDate('fecha', '>=', $semanaInicio)->whereDate('fecha', '<=', $semanaFin)
             ->orderBy('fecha')
             ->get();
 

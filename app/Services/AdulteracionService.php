@@ -45,7 +45,7 @@ class AdulteracionService
 
         $strikesEnSemana = Acopio::where('ganadero_id', $ganadero->id)
                                  ->whereIn('estado', ['rechazado', 'observado'])
-                                 ->whereBetween('fecha', [$inicioCiclo, $finCiclo])
+                                 ->whereDate('fecha', '>=', $inicioCiclo)->whereDate('fecha', '<=', $finCiclo)
                                  ->count();
 
         if ($strikesEnSemana >= 2) {
