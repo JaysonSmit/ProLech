@@ -101,7 +101,7 @@ class ProduccionService
                     'insumo'     => $detalle->insumo,
                     'cantidad'   => $cantidadNecesaria,
                     'costo_parcial' => round(
-                        $cantidadNecesaria * (float) $detalle->insumo->costo_unitario,
+                        $cantidadNecesaria * $detalle->insumo->costoVigente(),
                         4
                     ),
                 ];
@@ -245,8 +245,8 @@ class ProduccionService
                 'nombre'            => $detalle->insumo->nombre,
                 'unidad_medida'     => $detalle->insumo->unidad_medida,
                 'cantidad_necesaria' => $cantidadNecesaria,
-                'costo_unitario'    => (float) $detalle->insumo->costo_unitario,
-                'costo_parcial'     => round($cantidadNecesaria * (float) $detalle->insumo->costo_unitario, 2),
+                'costo_unitario'    => $detalle->insumo->costoVigente(),
+                'costo_parcial'     => round($cantidadNecesaria * $detalle->insumo->costoVigente(), 2),
                 'stock_actual'      => $stockActual,
                 'alcanza'           => $alcanza,
                 'faltante'          => $alcanza ? 0 : round($cantidadNecesaria - $stockActual, 4),

@@ -112,6 +112,10 @@
 </div>
 @endif
 
+@if(auth()->user()->isAdmin())
+<div style="margin-bottom:22px">@include('admin.costos._costo_leche')</div>
+
+@endif
 {{-- ── Tabla adulteraciones del día ────────────────────────────────────────── --}}
 <div class="card">
     <div class="card-header">

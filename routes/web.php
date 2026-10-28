@@ -221,6 +221,16 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
     Route::post('liquidaciones/{liquidacion}/confirmar', [LiquidacionController::class, 'confirmar'])->name('liquidaciones.confirmar');
     Route::post('liquidaciones/{liquidacion}/pagar',     [LiquidacionController::class, 'marcarPagada'])->name('liquidaciones.pagar');
 
+    Route::controller(\App\Http\Controllers\Web\PlanillaChoferController::class)->group(function () {
+        Route::get('planilla-choferes',                       'index')->name('planilla.index');
+        Route::post('planilla-choferes/generar',              'generar')->name('planilla.generar');
+        Route::get('planilla-choferes/exportar',              'exportar')->name('planilla.exportar');
+        Route::post('planilla-choferes/{planilla}/adelantos', 'adelantos')->name('planilla.adelantos');
+        Route::post('planilla-choferes/{planilla}/pagar',     'pagar')->name('planilla.pagar');
+        Route::get('planilla-choferes/{planilla}/boleta',     'boleta')->name('planilla.boleta');
+        Route::post('costo-leche/recalcular',                 'recalcularCostoLeche')->name('costo-leche.recalcular');
+    });
+
     Route::get('rotacion',                     [RotacionController::class, 'index'])->name('rotacion.index');
     Route::post('rotacion/generar-automatico', [RotacionController::class, 'generarAutomatico'])->name('rotacion.generar');
     Route::post('rotacion/asignar-manual',     [RotacionController::class, 'asignarManual'])->name('rotacion.asignar');

@@ -58,7 +58,7 @@ class Receta extends Model
     /** Costo de los insumos de UNA unidad (receta ÷ rendimiento), con los costos actuales del inventario. */
     public function costoUnitario(): float
     {
-        $total = $this->detalles->sum(fn ($d) => (float) $d->cantidad_requerida * (float) ($d->insumo->costo_unitario ?? 0));
+        $total = $this->detalles->sum(fn ($d) => (float) $d->cantidad_requerida * (float) ($d->insumo?->costoVigente() ?? 0));
         return round($total / max(1, (int) $this->rendimiento_esperado_unidades), 2);
     }
 
@@ -91,7 +91,7 @@ class Receta extends Model
             $resultado[] = [
                 'insumo'             => $detalle->insumo,
                 'cantidad_necesaria' => round($cantidadNecesaria, 4),
-                'costo_parcial'      => round($cantidadNecesaria * (float) $detalle->insumo->costo_unitario, 4),
+                'costo_parcial'      => round($cantidadNecesaria * $detalle->insumo->costoVigente(), 4),
             ];
         }
 

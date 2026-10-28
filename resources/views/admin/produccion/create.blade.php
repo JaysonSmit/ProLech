@@ -100,6 +100,8 @@
     </div>
 </div>
 
+<div style="margin-bottom:22px">@include('admin.costos._costo_leche')</div>
+
 {{-- ══════════════════════════════════════════════════════════════════════
      GRID PRINCIPAL — FORMULARIO + PROYECCIÓN
 ══════════════════════════════════════════════════════════════════════ --}}

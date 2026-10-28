@@ -784,6 +784,11 @@
             <span class="nav-icon">🗺️</span>
             <span>Mapa GPS</span>
         </a>
+        <a href="{{ route('admin.planilla.index') }}"
+           class="nav-link {{ request()->routeIs('admin.planilla*') ? 'active' : '' }}">
+            <span class="nav-icon">💼</span>
+            <span>Planilla choferes</span>
+        </a>
         <a href="{{ route('admin.operaciones.recorrido') }}"
            class="nav-link {{ request()->routeIs('admin.operaciones.recorrido*') ? 'active' : '' }}">
             <span class="nav-icon">🛰️</span>

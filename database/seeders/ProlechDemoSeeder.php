@@ -53,6 +53,7 @@ class ProlechDemoSeeder extends Seeder
         $this->historialAcopios($ganaderos, $zonas, $choferes);
         $this->rutaDeHoy($ganaderos, $zonas, $choferes);
         $this->liquidaciones();
+        $this->planillaChoferes();
         $productos = $this->produccionYTienda();
         $this->pedidos($productos);
 
@@ -364,6 +365,30 @@ class ProlechDemoSeeder extends Seeder
                 $liq->update(['estado' => 'pagada', 'pagada_at' => $pago, 'metodo_pago' => $g->metodo_pago_preferido ?? 'efectivo']);
             }
         }
+    }
+
+    // ── Planilla de choferes ──────────────────────────────────────────────
+
+    /** Últimas 4 semanas: las pasadas pagadas, la actual en borrador. Luego el costo real por litro. */
+    private function planillaChoferes(): void
+    {
+        $servicio = app(\App\Services\PlanillaChoferService::class);
+        $admin = User::where('rol', 'admin')->first();
+        $metodos = ['efectivo', 'yape', 'transferencia'];
+
+        for ($s = 3; $s >= 0; $s--) {
+            [$desde, $hasta] = \App\Services\PlanillaChoferService::periodo('semanal', now()->subWeeks($s));
+            if (\App\Models\PlanillaChofer::whereDate('periodo_inicio', $desde)->exists()) continue;
+
+            foreach ($servicio->generar('semanal', $desde, $hasta, $admin?->id) as $i => $planilla) {
+                if ($i === 1) $servicio->actualizarAdelantos($planilla, 50.0);   // un adelanto de ejemplo
+                if ($s > 0) {
+                    $servicio->pagar($planilla->fresh(), $metodos[$i % 3], $metodos[$i % 3] === 'efectivo' ? null : 'OP-' . (4100 + $s * 10 + $i));
+                    $planilla->update(['pagada_at' => $hasta->copy()->addDays(2)->setTime(17, 0)]);
+                }
+            }
+        }
+        app(\App\Services\CostoLecheService::class)->aplicarAInsumo();
     }
 
     // ── Producción y tienda ───────────────────────────────────────────────

@@ -135,6 +135,61 @@
 
         <div class="card">
             <div class="card-header">
+                <h3>🚚 Planilla de choferes y costo real por litro</h3>
+            </div>
+            <div class="card-body" style="padding:20px;display:flex;flex-direction:column;gap:16px">
+                <div class="form-group">
+                    <label class="form-label">Jornal del chofer por día (S/)</label>
+                    <input type="number" step="0.01" min="0" name="tarifa_chofer_dia"
+                           value="{{ $config->get('tarifa_chofer_dia')?->valor ?? '60' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Se paga por cada día con ruta en la planilla de choferes.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Bono del chofer por litro (S/)</label>
+                    <input type="number" step="0.001" min="0" name="bono_chofer_litro"
+                           value="{{ $config->get('bono_chofer_litro')?->valor ?? '0.02' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Incentivo por cada litro recolectado.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Aporte de pensión (%)</label>
+                    <input type="number" step="0.1" min="0" name="pension_chofer_pct"
+                           value="{{ $config->get('pension_chofer_pct')?->valor ?? '13' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Se retiene del bruto del chofer (ONP 13 %). 0 = sin retención.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Combustible por km (S/)</label>
+                    <input type="number" step="0.01" min="0" name="costo_combustible_km"
+                           value="{{ $config->get('costo_combustible_km')?->valor ?? '0.55' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Entra al costo real por litro (logística).</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Km por día sin GPS ni ruta trazada</label>
+                    <input type="number" step="1" min="0" name="km_ruta_default"
+                           value="{{ $config->get('km_ruta_default')?->valor ?? '45' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Respaldo cuando el celular no mandó GPS.</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Gastos generales de planta (%)</label>
+                    <input type="number" step="0.1" min="0" name="gastos_generales_pct"
+                           value="{{ $config->get('gastos_generales_pct')?->valor ?? '4' }}"
+                           class="form-control">
+                    <small style="color:var(--text-muted)">Luz, agua, limpieza… sobre el costo del litro.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
                 <h3>🏭 Parámetros de Producción</h3>
             </div>
             <div class="card-body" style="padding:20px;display:flex;flex-direction:column;gap:16px">

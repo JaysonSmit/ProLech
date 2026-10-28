@@ -45,3 +45,6 @@ Schedule::command('prolech:retirar-vencidos')->dailyAt('06:35');
 // una entrega menos a los ganaderos bloqueados cuyo camión pasó por su ruta
 Schedule::command('prolech:calidad sortear')->dailyAt('04:30');
 Schedule::command('prolech:calidad bloqueos')->dailyAt('23:30');
+
+// Costo real por litro (precio al ganadero + logística + gastos) para recetas y lotes del día
+Schedule::command('prolech:costo-leche')->dailyAt('05:00');
