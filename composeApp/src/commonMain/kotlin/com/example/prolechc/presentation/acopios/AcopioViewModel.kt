@@ -4,14 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.prolechc.data.archivos.borrarArchivo
 import com.example.prolechc.data.dispositivo.AccionesTicket
-import com.example.prolechc.data.dispositivo.LectorLactoscan
 import com.example.prolechc.data.network.MonitorConectividad
 import com.example.prolechc.data.sync.SyncManager
 import com.example.prolechc.domain.Tiempo
 import com.example.prolechc.domain.model.Acopio
-import com.example.prolechc.domain.model.EstadoCalidad
 import com.example.prolechc.domain.model.EstadoSync
 import com.example.prolechc.domain.model.GanaderoCampo
+import com.example.prolechc.domain.model.Observacion
 import com.example.prolechc.domain.ticket.Ticket
 import com.example.prolechc.domain.usecase.ActualizarAcopioUseCase
 import com.example.prolechc.domain.usecase.EliminarAcopioUseCase
@@ -37,22 +36,16 @@ data class FormularioAcopio(
     val ganaderoId: String     = "",
     val ganaderoNombre: String = "",
     val litros: String         = "",
-    val porcentajeAgua: String = "0",
-    val densidad: String       = "1.030",
-    val grasa: String          = "",
+    /** Lo que el chofer ve a simple vista; la calidad la mide la planta con muestras sorpresa. */
+    val observacion: Observacion = Observacion.NORMAL,
+    val observacionNota: String  = "",
+    /** Frasco que la planta pidió llenar en esta entrega (null = hoy no toca). */
+    val muestraCodigo: String? = null,
     /** Foto de evidencia tomada para este acopio (ruta local). */
     val fotoLocal: String?     = null,
     /** Acopio que se está editando; null = registro nuevo. */
     val editando: Acopio?      = null
-) {
-    /** Vista previa de la calidad mientras se escriben los datos del Lactoscan. */
-    val calidadPrevia: EstadoCalidad?
-        get() {
-            val agua = porcentajeAgua.aNumero() ?: return null
-            val dens = densidad.aNumero() ?: return null
-            return EstadoCalidad.evaluar(agua, dens)
-        }
-}
+)
 
 /** Datos de la ruta que necesita la pantalla (capacidad del camión y nombres del ticket). */
 data class ContextoRuta(
@@ -70,8 +63,7 @@ data class AcopioUiState(
     val sincronizando: Boolean         = false,
     val mensaje: String?               = null,
     val contexto: ContextoRuta         = ContextoRuta(),
-    val inicioHoy: Long                = 0,
-    val leyendoLactoscan: Boolean      = false
+    val inicioHoy: Long                = 0
 ) {
     val pendientes: Int get() = acopios.count { it.estadoSync != EstadoSync.SINCRONIZADO }
     val conError: Int get() = acopios.count { it.errorSync != null }
@@ -94,28 +86,25 @@ class AcopioViewModel(
     monitor: MonitorConectividad,
     syncManager: SyncManager,
     private val reloj: () -> Long = { Tiempo.ahoraMs() },
-    private val lector: LectorLactoscan? = null,
     private val accionesTicket: AccionesTicket? = null,
     contexto: kotlinx.coroutines.flow.Flow<ContextoRuta> = flowOf(ContextoRuta())
 ) : ViewModel() {
 
     private val mensaje = MutableStateFlow<String?>(null)
     private val formulario = MutableStateFlow(FormularioAcopio())
-    private val leyendo = MutableStateFlow(false)
     private var nivelAvisado = NivelCarga.NORMAL
 
     /** La UI solo lee de SQLDelight (Single Source of Truth). */
     val uiState: StateFlow<AcopioUiState> = combine(
         observarAcopios(),
         observarGanaderos(),
-        combine(monitor.enLinea, syncManager.sincronizando, leyendo, ::Triple),
+        combine(monitor.enLinea, syncManager.sincronizando, ::Pair),
         contexto,
         combine(formulario, mensaje) { form, msg -> form to msg }
-    ) { acopios, ganaderos, (enLinea, sincronizando, leyendoOcr), ctx, (form, msg) ->
+    ) { acopios, ganaderos, (enLinea, sincronizando), ctx, (form, msg) ->
         AcopioUiState(
             acopios, ganaderos, form, enLinea, sincronizando, msg, ctx,
-            inicioHoy = Tiempo.inicioDelDiaMs(reloj()),
-            leyendoLactoscan = leyendoOcr
+            inicioHoy = Tiempo.inicioDelDiaMs(reloj())
         )
     }.stateIn(
         scope        = viewModelScope,
@@ -126,21 +115,24 @@ class AcopioViewModel(
     // ── Formulario ────────────────────────────────────────────────────────────
 
     fun onGanaderoSeleccionado(ganadero: GanaderoCampo) {
-        if (ganadero.suspendido) {
-            mensaje.value = "${ganadero.nombre} está suspendido por calidad: no se puede acopiar"
-            return
-        }
+        motivoNoEntrega(ganadero)?.let { mensaje.value = it; return }
         formulario.update {
-            it.copy(ganaderoId = ganadero.id.toString(), ganaderoNombre = ganadero.nombre)
+            it.copy(ganaderoId = ganadero.id.toString(), ganaderoNombre = ganadero.nombre, muestraCodigo = ganadero.muestra)
         }
+        ganadero.muestra?.let { mensaje.value = "🧪 Hoy toca muestra: llena el frasco $it con su leche" }
+    }
+
+    private fun motivoNoEntrega(g: GanaderoCampo): String? = when {
+        g.suspendido    -> "${g.nombre} está suspendido por calidad: no se puede acopiar"
+        g.bloqueado > 0 -> "${g.nombre} no puede entregar por sanción de calidad (faltan ${g.bloqueado} entrega(s))"
+        else            -> null
     }
 
     fun onGanaderoId(valor: String) = formulario.update { it.copy(ganaderoId = valor) }
     fun onGanaderoNombre(valor: String) = formulario.update { it.copy(ganaderoNombre = valor) }
     fun onLitros(valor: String) = formulario.update { it.copy(litros = valor) }
-    fun onPorcentajeAgua(valor: String) = formulario.update { it.copy(porcentajeAgua = valor) }
-    fun onDensidad(valor: String) = formulario.update { it.copy(densidad = valor) }
-    fun onGrasa(valor: String) = formulario.update { it.copy(grasa = valor) }
+    fun onObservacion(valor: Observacion) = formulario.update { it.copy(observacion = valor) }
+    fun onObservacionNota(valor: String) = formulario.update { it.copy(observacionNota = valor) }
 
     /** Foto de evidencia del balde / leche rechazada. */
     fun onFotoEvidencia(ruta: String?) {
@@ -151,44 +143,14 @@ class AcopioViewModel(
 
     fun quitarFoto() = formulario.update { it.copy(fotoLocal = null) }
 
-    /**
-     * Foto de la pantalla/ticket del Lactoscan → OCR → llena agua, densidad y grasa.
-     * La misma foto queda como evidencia del acopio.
-     */
-    fun onFotoLactoscan(ruta: String?) {
-        if (ruta == null) return
-        val lectorOcr = lector ?: run { onFotoEvidencia(ruta); return }
-        viewModelScope.launch {
-            leyendo.value = true
-            lectorOcr.leer(ruta)
-                .onSuccess { r ->
-                    if (r.vacio) {
-                        mensaje.value = "No se reconocieron valores. Acerca la cámara y evita reflejos."
-                    } else {
-                        formulario.update {
-                            it.copy(
-                                porcentajeAgua = r.aguaAniadida?.let { v -> formato(v, 1) } ?: it.porcentajeAgua,
-                                densidad       = r.densidad?.let { v -> formato(v, 3) } ?: it.densidad,
-                                grasa          = r.grasa?.let { v -> formato(v, 1) } ?: it.grasa,
-                                fotoLocal      = ruta
-                            )
-                        }
-                        mensaje.value = "🔎 Lactoscan leído: revisa los valores antes de guardar"
-                    }
-                }
-                .onFailure { mensaje.value = "No se pudo leer el Lactoscan: ${it.message}" }
-            leyendo.value = false
-        }
-    }
-
     fun editar(acopio: Acopio) {
         formulario.value = FormularioAcopio(
             ganaderoId     = acopio.ganaderoId.toString(),
             ganaderoNombre = acopio.ganaderoNombre,
             litros         = acopio.litros.toString(),
-            porcentajeAgua = acopio.porcentajeAgua.toString(),
-            densidad       = acopio.densidad.toString(),
-            grasa          = acopio.grasa?.toString().orEmpty(),
+            observacion    = Observacion.de(acopio.observacion) ?: Observacion.NORMAL,
+            observacionNota = acopio.observacionNota.orEmpty(),
+            muestraCodigo  = acopio.muestraCodigo,
             fotoLocal      = acopio.fotoLocal,
             editando       = acopio
         )
@@ -203,21 +165,19 @@ class AcopioViewModel(
         val form = formulario.value
         val id   = form.ganaderoId.trim().toLongOrNull()
         val lts  = form.litros.aNumero()
-        val agua = form.porcentajeAgua.aNumero()
-        val dens = form.densidad.aNumero()
-        val grasa = form.grasa.takeIf { it.isNotBlank() }?.aNumero()
-        if (id == null || lts == null || agua == null || dens == null) {
-            mensaje.value = "Completa todos los campos con valores numéricos"
+        if (id == null || lts == null) {
+            mensaje.value = "Elige el ganadero y escribe los litros (ej. 40,5)"
             return
         }
-        if (form.grasa.isNotBlank() && grasa == null) {
-            mensaje.value = "La grasa debe ser un número (ej. 3.5)"
+        if (form.observacion == Observacion.OTRO && form.observacionNota.isBlank()) {
+            mensaje.value = "Escribe qué notaste raro en la leche"
             return
         }
-        if (uiState.value.ganaderos.any { it.id == id && it.suspendido }) {
-            mensaje.value = "El ganadero está suspendido por calidad: no se puede acopiar"
-            return
+        if (form.editando == null) {
+            uiState.value.ganaderos.firstOrNull { it.id == id }?.let(::motivoNoEntrega)?.let { mensaje.value = it; return }
         }
+        val observacion = form.observacion.clave
+        val nota = form.observacionNota.trim().takeIf { it.isNotEmpty() }
         // Regla del negocio (igual que POST /api/acopios): una entrega por ganadero al día
         if (form.editando == null) {
             val inicioHoy = Tiempo.inicioDelDiaMs(reloj())
@@ -230,7 +190,10 @@ class AcopioViewModel(
         viewModelScope.launch {
             val editando = form.editando
             val resultado = if (editando == null) {
-                registrarAcopio(id, form.ganaderoNombre, lts, agua, dens, grasa, form.fotoLocal)
+                registrarAcopio(
+                    id, form.ganaderoNombre, lts, fotoLocal = form.fotoLocal,
+                    observacion = observacion, observacionNota = nota, muestraCodigo = form.muestraCodigo
+                )
             } else {
                 // Si se cambió la foto, la anterior ya no sirve
                 if (editando.fotoLocal != null && editando.fotoLocal != form.fotoLocal) borrarArchivo(editando.fotoLocal)
@@ -239,9 +202,8 @@ class AcopioViewModel(
                         ganaderoId     = id,
                         ganaderoNombre = form.ganaderoNombre.trim(),
                         litros         = lts,
-                        porcentajeAgua = agua,
-                        densidad       = dens,
-                        grasa          = grasa,
+                        observacion    = observacion,
+                        observacionNota = nota,
                         fotoLocal      = form.fotoLocal
                     )
                 )
@@ -254,8 +216,10 @@ class AcopioViewModel(
                         ganaderoNombre = form.ganaderoNombre
                     ).takeIf { editando == null } ?: FormularioAcopio()
                     val accion = if (editando == null) "guardado" else "actualizado"
-                    mensaje.value = avisoCapacidad() ?: if (uiState.value.enLinea) {
-                        "Acopio $accion (${acopio.estadoCalidad.name})"
+                    mensaje.value = avisoCapacidad() ?: if (acopio.muestraCodigo != null) {
+                        "Acopio $accion · frasco ${acopio.muestraCodigo} tomado: entrégalo en la planta"
+                    } else if (uiState.value.enLinea) {
+                        "Acopio $accion"
                     } else {
                         "Acopio $accion sin conexión: se subirá al recuperar la red"
                     }

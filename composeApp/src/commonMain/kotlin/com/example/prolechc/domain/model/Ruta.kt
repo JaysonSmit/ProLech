@@ -30,5 +30,9 @@ data class Parada(
     val geoLon: Double?,
     val atendido: Boolean,
     /** true cuando el proveedor está en estado "Suspendido" por faltas de calidad */
-    val suspendido: Boolean = false
+    val suspendido: Boolean = false,
+    /** Entregas que aún no puede hacer por una sanción de calidad */
+    val bloqueado: Int = 0,
+    /** Frasco de muestra sorpresa de hoy (solo se muestra al registrar la entrega) */
+    val muestra: String? = null
 )

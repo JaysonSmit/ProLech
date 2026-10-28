@@ -16,7 +16,9 @@ class GanaderoRemotoKtor(private val rutaRemote: RutaRemoteDataSource) : Ganader
                 id         = parada.ganaderoId.toLong(),
                 nombre     = parada.ganaderoNombre,
                 dni        = parada.ganaderoNii,
-                suspendido = parada.suspendido
+                suspendido = parada.suspendido,
+                bloqueado  = parada.bloqueado,
+                muestra    = parada.muestra
             )
         }
 }

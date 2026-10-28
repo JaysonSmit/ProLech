@@ -7,6 +7,7 @@ import com.example.prolechc.data.sync.SyncManager
 import com.example.prolechc.domain.model.EstadoCalidad
 import com.example.prolechc.domain.model.EstadoSync
 import com.example.prolechc.domain.model.GanaderoCampo
+import com.example.prolechc.domain.model.Observacion
 import com.example.prolechc.domain.usecase.ActualizarAcopioUseCase
 import com.example.prolechc.domain.usecase.EliminarAcopioUseCase
 import com.example.prolechc.domain.usecase.LogoutUseCase
@@ -137,12 +138,30 @@ class AcopioViewModelTest {
     }
 
     @Test
-    fun calidad_previa_se_calcula_mientras_se_escribe() = runTest {
+    fun no_permite_acopiar_a_un_ganadero_bloqueado_por_calidad() = runTest {
         val e = Escenario(this)
-        e.vm.onPorcentajeAgua("5")
+        e.vm.onGanaderoSeleccionado(GanaderoCampo(12, "Martina Choque", "29301823", bloqueado = 2))
         advanceUntilIdle()
 
-        assertEquals(EstadoCalidad.RECHAZADO, e.vm.uiState.value.formulario.calidadPrevia)
+        assertEquals("", e.vm.uiState.value.formulario.ganaderoId)
+        assertTrue(e.vm.uiState.value.mensaje!!.contains("2 entrega"))
+    }
+
+    @Test
+    fun registra_solo_litros_con_observacion_y_frasco_de_muestra() = runTest {
+        val e = Escenario(this)
+        e.vm.onGanaderoSeleccionado(GanaderoCampo(7, "Juan Quispe", "1", muestra = "M-0001"))
+        e.vm.onLitros("40")
+        e.vm.onObservacion(Observacion.OLOR)
+        e.vm.onObservacionNota("huele agrio")
+        e.vm.guardar()
+        advanceUntilIdle()
+
+        val acopio = e.vm.uiState.value.acopios.single()
+        assertEquals(EstadoCalidad.APROBADO, acopio.estadoCalidad)
+        assertEquals("olor", acopio.observacion)
+        assertEquals("huele agrio", acopio.observacionNota)
+        assertEquals("M-0001", acopio.muestraCodigo)
     }
 
     @Test

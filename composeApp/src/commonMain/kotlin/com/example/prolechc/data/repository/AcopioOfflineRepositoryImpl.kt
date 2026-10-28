@@ -36,7 +36,10 @@ class AcopioOfflineRepositoryImpl(
         porcentajeAgua: Double,
         densidad: Double,
         grasa: Double?,
-        fotoLocal: String?
+        fotoLocal: String?,
+        observacion: String?,
+        observacionNota: String?,
+        muestraCodigo: String?
     ): Acopio {
         val acopio = Acopio(
             id             = generarId(),
@@ -45,11 +48,14 @@ class AcopioOfflineRepositoryImpl(
             litros         = litros,
             porcentajeAgua = porcentajeAgua,
             densidad       = densidad,
-            estadoCalidad  = EstadoCalidad.evaluar(porcentajeAgua, densidad),
+            estadoCalidad  = calidadDeCampo(porcentajeAgua, densidad),
             actualizadoEn  = reloj(),
             estadoSync     = EstadoSync.PENDIENTE_CREAR,
             grasa          = grasa,
-            fotoLocal      = fotoLocal
+            fotoLocal      = fotoLocal,
+            observacion     = observacion,
+            observacionNota = observacionNota?.takeIf { it.isNotBlank() },
+            muestraCodigo   = muestraCodigo
         )
         local.guardar(acopio)
         syncManager.solicitarSincronizacion()
@@ -65,7 +71,7 @@ class AcopioOfflineRepositoryImpl(
             EstadoSync.PENDIENTE_ACTUALIZAR
         }
         val actualizado = acopio.copy(
-            estadoCalidad = EstadoCalidad.evaluar(acopio.porcentajeAgua, acopio.densidad),
+            estadoCalidad = calidadDeCampo(acopio.porcentajeAgua, acopio.densidad),
             actualizadoEn = reloj(),
             estadoSync    = estado,
             // Al corregirlo, el registro rechazado vuelve a intentarse
@@ -85,3 +91,10 @@ class AcopioOfflineRepositoryImpl(
 
     override suspend fun sincronizar(): ResultadoSync = syncManager.sincronizar()
 }
+
+/**
+ * El chofer ya no mide la calidad (la miden las muestras sorpresa de la planta): sin medidas
+ * el acopio queda APROBADO. Si llegan medidas (versiones anteriores), se usa la regla de campo.
+ */
+internal fun calidadDeCampo(porcentajeAgua: Double, densidad: Double): EstadoCalidad =
+    if (porcentajeAgua == 0.0 && densidad == 0.0) EstadoCalidad.APROBADO else EstadoCalidad.evaluar(porcentajeAgua, densidad)

@@ -216,7 +216,6 @@ val viewModelModule = module {
             logout             = get(),
             monitor            = get(),
             syncManager        = get(),
-            lector             = get(),
             accionesTicket     = get(),
             contexto           = run {
                 val config = get<com.example.prolechc.data.local.ConfigLocal>()

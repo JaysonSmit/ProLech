@@ -56,5 +56,7 @@ data class ParadaDto(
     @SerialName("geo_lat")         val geoLat: Double?     = null,
     @SerialName("geo_lon")         val geoLon: Double?     = null,
     @SerialName("atendido")        val atendido: Boolean   = false,
-    @SerialName("suspendido")      val suspendido: Boolean = false
+    @SerialName("suspendido")      val suspendido: Boolean = false,
+    @SerialName("bloqueado")       val bloqueado: Int = 0,
+    @SerialName("muestra")         val muestra: String? = null
 )

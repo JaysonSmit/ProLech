@@ -33,7 +33,9 @@ fun MiRutaResponseDto.toDomain(): Ruta {
             geoLat         = p.geoLat,
             geoLon         = p.geoLon,
             atendido       = p.atendido,
-            suspendido     = p.suspendido
+            suspendido     = p.suspendido,
+            bloqueado      = p.bloqueado,
+            muestra        = p.muestra
         )
     }
 

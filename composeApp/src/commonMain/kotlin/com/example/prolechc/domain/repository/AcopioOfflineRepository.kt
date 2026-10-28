@@ -14,10 +14,13 @@ interface AcopioOfflineRepository {
         ganaderoId: Long,
         ganaderoNombre: String,
         litros: Double,
-        porcentajeAgua: Double,
-        densidad: Double,
+        porcentajeAgua: Double = 0.0,
+        densidad: Double = 0.0,
         grasa: Double? = null,
-        fotoLocal: String? = null
+        fotoLocal: String? = null,
+        observacion: String? = null,
+        observacionNota: String? = null,
+        muestraCodigo: String? = null
     ): Acopio
     suspend fun actualizar(acopio: Acopio): Acopio
     suspend fun eliminar(id: String)

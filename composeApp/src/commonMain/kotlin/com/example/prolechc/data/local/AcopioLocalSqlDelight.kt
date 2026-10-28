@@ -91,7 +91,10 @@ fun AcopioEntity.toDomain(): Acopio = Acopio(
     errorSync      = errorSync,
     grasa          = grasa,
     fotoLocal      = fotoLocal,
-    fotoSubida     = fotoSubida == 1L
+    fotoSubida     = fotoSubida == 1L,
+    observacion     = observacion,
+    observacionNota = observacionNota,
+    muestraCodigo   = muestraCodigo
 )
 
 fun Acopio.toEntity(): AcopioEntity = AcopioEntity(
@@ -107,5 +110,8 @@ fun Acopio.toEntity(): AcopioEntity = AcopioEntity(
     errorSync      = errorSync,
     grasa          = grasa,
     fotoLocal      = fotoLocal,
-    fotoSubida     = if (fotoSubida) 1L else 0L
+    fotoSubida     = if (fotoSubida) 1L else 0L,
+    observacion     = observacion,
+    observacionNota = observacionNota,
+    muestraCodigo   = muestraCodigo
 )

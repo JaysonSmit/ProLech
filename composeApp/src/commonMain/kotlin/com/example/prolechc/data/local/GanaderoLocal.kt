@@ -45,12 +45,16 @@ fun GanaderoEntity.toDomain(): GanaderoCampo = GanaderoCampo(
     id         = id,
     nombre     = nombre,
     dni        = dni,
-    suspendido = suspendido == 1L
+    suspendido = suspendido == 1L,
+    bloqueado  = bloqueado.toInt(),
+    muestra    = muestra
 )
 
 fun GanaderoCampo.toEntity(): GanaderoEntity = GanaderoEntity(
     id         = id,
     nombre     = nombre,
     dni        = dni,
-    suspendido = if (suspendido) 1L else 0L
+    suspendido = if (suspendido) 1L else 0L,
+    bloqueado  = bloqueado.toLong(),
+    muestra    = muestra
 )

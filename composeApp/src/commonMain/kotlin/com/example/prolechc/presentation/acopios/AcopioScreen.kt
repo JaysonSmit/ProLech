@@ -1,5 +1,7 @@
 package com.example.prolechc.presentation.acopios
 
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -55,6 +57,7 @@ import com.example.prolechc.domain.model.Acopio
 import com.example.prolechc.domain.model.EstadoCalidad
 import com.example.prolechc.domain.model.EstadoSync
 import com.example.prolechc.domain.model.GanaderoCampo
+import com.example.prolechc.domain.model.Observacion
 import com.example.prolechc.presentation.colorCarga
 import com.example.prolechc.presentation.formato
 import org.koin.compose.viewmodel.koinViewModel
@@ -149,7 +152,6 @@ fun AcopioScreen(
                 FormularioAcopioCard(
                     form      = state.formulario,
                     ganaderos = state.ganaderos,
-                    leyendo   = state.leyendoLactoscan,
                     viewModel = viewModel
                 )
             }
@@ -244,15 +246,14 @@ private fun Chip(texto: String) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun FormularioAcopioCard(
     form: FormularioAcopio,
     ganaderos: List<GanaderoCampo>,
-    leyendo: Boolean,
     viewModel: AcopioViewModel
 ) {
     val numerico = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-    val fotoLactoscan = rememberTomarFoto(viewModel::onFotoLactoscan)
     val fotoEvidencia = rememberTomarFoto(viewModel::onFotoEvidencia)
 
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -288,34 +289,41 @@ private fun FormularioAcopioCard(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = form.litros, onValueChange = viewModel::onLitros,
-                    label = { Text("Litros") }, keyboardOptions = numerico,
-                    singleLine = true, modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = form.porcentajeAgua, onValueChange = viewModel::onPorcentajeAgua,
-                    label = { Text("% Agua") }, keyboardOptions = numerico,
-                    singleLine = true, modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = form.densidad, onValueChange = viewModel::onDensidad,
-                    label = { Text("Densidad") }, keyboardOptions = numerico,
-                    singleLine = true, modifier = Modifier.weight(1f)
-                )
+            // Frasco de muestra sorpresa: el chofer se entera recién al elegir al ganadero
+            form.muestraCodigo?.let { frasco ->
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        Text("🧪 Hoy toca muestra", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Llena el frasco $frasco con leche de este ganadero, ciérralo y entrégalo en la planta.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             }
 
-            // Lectura automática del Lactoscan con la cámara (OCR en el celular, sin señal)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(onClick = fotoLactoscan, enabled = !leyendo, modifier = Modifier.weight(1f)) {
-                    if (leyendo) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                    else Text("🔎 Leer Lactoscan")
+            OutlinedTextField(
+                value = form.litros, onValueChange = viewModel::onLitros,
+                label = { Text("Litros entregados") }, keyboardOptions = numerico,
+                singleLine = true, modifier = Modifier.fillMaxWidth()
+            )
+
+            // Solo lo que se ve a simple vista; la calidad la mide la planta
+            Text("¿Cómo se ve la leche?", style = MaterialTheme.typography.labelLarge)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Observacion.entries.forEach { o ->
+                    FilterChip(
+                        selected = form.observacion == o,
+                        onClick  = { viewModel.onObservacion(o) },
+                        label    = { Text(o.etiqueta) }
+                    )
                 }
+            }
+            if (form.observacion != Observacion.NORMAL) {
                 OutlinedTextField(
-                    value = form.grasa, onValueChange = viewModel::onGrasa,
-                    label = { Text("% Grasa") }, keyboardOptions = numerico,
-                    singleLine = true, modifier = Modifier.weight(1f)
+                    value = form.observacionNota, onValueChange = viewModel::onObservacionNota,
+                    label = { Text(if (form.observacion == Observacion.OTRO) "¿Qué notaste?" else "Nota (opcional)") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
             }
 
@@ -327,14 +335,6 @@ private fun FormularioAcopioCard(
                     TextButton(onClick = fotoEvidencia) { Text("Cambiar") }
                     TextButton(onClick = viewModel::quitarFoto) { Text("Quitar") }
                 }
-            }
-
-            form.calidadPrevia?.let { calidad ->
-                Text(
-                    text  = "Calidad estimada: ${calidad.name}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colorCalidad(calidad)
-                )
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -369,14 +369,18 @@ private fun SelectorGanadero(
                         Column {
                             Text(g.nombre)
                             Text(
-                                text  = if (g.suspendido) "DNI ${g.dni} · SUSPENDIDO" else "DNI ${g.dni}",
+                                text  = when {
+                                    g.suspendido    -> "DNI ${g.dni} · SUSPENDIDO"
+                                    g.bloqueado > 0 -> "DNI ${g.dni} · BLOQUEADO (${g.bloqueado} entrega(s))"
+                                    else            -> "DNI ${g.dni}"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
-                                color = if (g.suspendido) MaterialTheme.colorScheme.error
+                                color = if (!g.puedeEntregar) MaterialTheme.colorScheme.error
                                         else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     },
-                    enabled = !g.suspendido,
+                    enabled = g.puedeEntregar,
                     onClick = {
                         onSeleccion(g)
                         abierto = false
@@ -414,17 +418,16 @@ private fun AcopioItem(
                     acopio.ganaderoNombre + if (acopio.fotoLocal != null) "  📷" else "",
                     style = MaterialTheme.typography.titleSmall
                 )
+                val obs = Observacion.de(acopio.observacion)?.takeIf { it != Observacion.NORMAL }
                 Text(
-                    "${formato(acopio.litros, 2)} L · Agua ${formato(acopio.porcentajeAgua, 1)}% · " +
-                        "Dens. ${formato(acopio.densidad, 3)}" +
-                        (acopio.grasa?.let { " · Grasa ${formato(it, 1)}%" } ?: ""),
+                    "${formato(acopio.litros, 2)} L" +
+                        (obs?.let { " · ${it.etiqueta}" } ?: "") +
+                        (acopio.observacionNota?.let { " — $it" } ?: ""),
                     style = MaterialTheme.typography.bodySmall
                 )
-                Text(
-                    text  = acopio.estadoCalidad.name,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colorCalidad(acopio.estadoCalidad)
-                )
+                acopio.muestraCodigo?.let {
+                    Text("🧪 Frasco $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.tertiary)
+                }
                 if (conError) {
                     // Rechazado por el servidor: no se reintenta hasta corregirlo
                     Text(

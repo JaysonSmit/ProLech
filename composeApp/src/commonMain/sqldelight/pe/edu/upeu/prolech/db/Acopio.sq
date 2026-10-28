@@ -19,7 +19,12 @@ CREATE TABLE AcopioEntity (
     grasa          REAL,
     -- Foto de evidencia guardada en el celular y si ya se subió al servidor
     fotoLocal      TEXT,
-    fotoSubida     INTEGER NOT NULL DEFAULT 0
+    fotoSubida     INTEGER NOT NULL DEFAULT 0,
+    -- Lo que el chofer vio a simple vista: normal, olor, color, grumos, caliente, otro
+    observacion     TEXT,
+    observacionNota TEXT,
+    -- Frasco de muestra sorpresa que la planta pidió en esta entrega
+    muestraCodigo   TEXT
 );
 
 selectAll:
