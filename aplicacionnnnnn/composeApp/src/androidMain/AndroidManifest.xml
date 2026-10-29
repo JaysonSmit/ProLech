@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Manifiesto de la librería: se fusiona con el de :composeAndroidApp -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Permisos de red -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- GPS de la ruta de acopio -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Rastreo con la pantalla apagada (servicio en primer plano tipo "location") -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- osmdroid guarda en caché los mosaicos del mapa para verlos sin señal -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Impresora térmica del ticket (Android 12+ pide BLUETOOTH_CONNECT en tiempo de ejecución) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Cámara para la foto de evidencia y la lectura del Lactoscan (opcional) -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
+    <application>
+        <service
+            android:name="com.example.prolechc.data.location.ServicioRastreo"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+    </application>
+</manifest>

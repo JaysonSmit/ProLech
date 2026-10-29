@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Desarrollo: el backend Laravel corre por HTTP en la red local y su IP cambia
+    según la red (192.168.0.x, 192.168.1.x, 10.0.2.2 en el emulador...). Antes solo se
+    permitía 192.168.1.5 y con cualquier otra IP Android bloqueaba la conexión.
+    Solo para builds debug: el release usa src/main (solo HTTPS).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

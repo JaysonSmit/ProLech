@@ -1,0 +1,70 @@
+-- Tabla local de acopios de leche (Single Source of Truth de la app).
+-- El id es un UUID generado en el celular para poder crear registros sin red.
+CREATE TABLE AcopioEntity (
+    id             TEXT    NOT NULL PRIMARY KEY,
+    ganaderoId     INTEGER NOT NULL,
+    ganaderoNombre TEXT    NOT NULL,
+    litros         REAL    NOT NULL,
+    porcentajeAgua REAL    NOT NULL,
+    densidad       REAL    NOT NULL,
+    -- 'APROBADO' | 'OBSERVADO' | 'RECHAZADO'
+    estadoCalidad  TEXT    NOT NULL,
+    -- Timestamp en ms: resolución de conflictos Last-Write-Wins
+    actualizadoEn  INTEGER NOT NULL,
+    -- 'SINCRONIZADO' | 'PENDIENTE_CREAR' | 'PENDIENTE_ACTUALIZAR' | 'PENDIENTE_ELIMINAR'
+    estadoSync     TEXT    NOT NULL DEFAULT 'SINCRONIZADO',
+    -- Motivo por el que el servidor rechazó el registro (no se reintenta hasta corregirlo)
+    errorSync      TEXT,
+    -- % de grasa leído del Lactoscan (opcional)
+    grasa          REAL,
+    -- Foto de evidencia guardada en el celular y si ya se subió al servidor
+    fotoLocal      TEXT,
+    fotoSubida     INTEGER NOT NULL DEFAULT 0,
+    -- Lo que el chofer vio a simple vista: normal, olor, color, grumos, caliente, otro
+    observacion     TEXT,
+    observacionNota TEXT,
+    -- Frasco de muestra sorpresa que la planta pidió en esta entrega
+    muestraCodigo   TEXT
+);
+
+selectAll:
+SELECT *
+FROM AcopioEntity
+WHERE estadoSync != 'PENDIENTE_ELIMINAR'
+ORDER BY actualizadoEn DESC;
+
+selectPendientes:
+SELECT *
+FROM AcopioEntity
+WHERE estadoSync != 'SINCRONIZADO';
+
+selectFotosPendientes:
+SELECT *
+FROM AcopioEntity
+WHERE fotoSubida = 0 AND estadoSync = 'SINCRONIZADO';
+
+selectById:
+SELECT *
+FROM AcopioEntity
+WHERE id = ?;
+
+upsert:
+INSERT OR REPLACE INTO AcopioEntity VALUES ?;
+
+marcarSincronizado:
+UPDATE AcopioEntity SET estadoSync = 'SINCRONIZADO', errorSync = NULL WHERE id = ?;
+
+marcarError:
+UPDATE AcopioEntity SET errorSync = ? WHERE id = ?;
+
+marcarFotoSubida:
+UPDATE AcopioEntity SET fotoSubida = 1 WHERE id = ?;
+
+marcarPendienteEliminar:
+UPDATE AcopioEntity SET estadoSync = 'PENDIENTE_ELIMINAR', actualizadoEn = ?, errorSync = NULL WHERE id = ?;
+
+deleteById:
+DELETE FROM AcopioEntity WHERE id = ?;
+
+deleteAll:
+DELETE FROM AcopioEntity;
