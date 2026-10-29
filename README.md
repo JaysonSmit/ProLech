@@ -1,4 +1,36 @@
-﻿# ProLech — Sistema de Gestión para el Acopio de Leche
+# ProLech — Sistema de Gestión para el Acopio de Leche
+
+## Estructura del repositorio (estado al cierre del Sprint 2)
+
+| Carpeta | Contenido |
+|---|---|
+| `prolech-backend/` | Backend **Laravel 13 / PHP 8.5** (MVC + servicios): API REST con Sanctum, panel web por roles, tienda en línea, liquidación semanal, planilla de choferes, costo real por litro, kárdex valorizado. 67 migraciones · 185 pruebas PHPUnit. |
+| `aplicacionnnnnn/` | App de campo **Kotlin Multiplatform + Compose** (`pe.prolech.acopio`), offline-first con **SQLDelight 2**, **Ktor**, **Koin**, **OSMDroid** y `SyncManager` (Last-Write-Wins). 67 pruebas kotlin.test. |
+| `docs/` | Documentación inicial del equipo (comparativa, checklist de viabilidad, actas). |
+
+### Ramas
+
+| Rama | Propósito |
+|---|---|
+| `main` | Versión estable entregada (v1.1). |
+| `develop` | Integración de los sprints. |
+| `feature/sprint1-core-acopio-liquidacion` | Sprint 1: acopio con Lactoscan, calidad, rotación de choferes y liquidación semanal. |
+| `fix/regla-2-strikes-semana` | Corrección: la regla de 2 strikes usa la semana jueves–miércoles y cuenta los acopios de la app. |
+| `feature/sprint2-kmp-offline-sqldelight` | Sprint 2: app KMP offline-first con SQLDelight, Ktor y OSMDroid. |
+| `feature/sprint2-planilla-costo-leche` | Sprint 2: planilla de choferes, costo real por litro, control sorpresa, producción y e-commerce. |
+
+### Ejecutar
+
+```bash
+cd prolech-backend && composer install && cp .env.example .env && php artisan key:generate
+php artisan migrate --seed && php artisan db:seed --class=ProlechDemoSeeder
+php artisan serve --host=0.0.0.0 --port=8080
+```
+
+```bash
+cd aplicacionnnnnn && ./gradlew :composeApp:testAndroidHostTest :composeAndroidApp:assembleDebug
+```
+
 
 Aplicación multiplataforma para gestionar y auditar el proceso de acopio de leche, desde la recolección en campo con los productores hasta su recepción y evaluación en planta.
 
