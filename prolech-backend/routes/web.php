@@ -31,12 +31,7 @@ use Illuminate\Support\Facades\Route;
 // ── Raíz: redirigir según rol ─────────────────────────────────────────────────
 Route::get('/', function () {
     if (auth()->check()) {
-        $rol = auth()->user()->rol;
-        if ($rol === 'proveedor') {
-            return redirect()->route('proveedor.dashboard');
-        }
-
-        return redirect()->route(RolWeb::rutaInicio($rol));
+        return redirect()->route(auth()->user()->rutaInicioWeb());
     }
     return redirect()->route('login');
 });
@@ -109,7 +104,7 @@ Route::middleware(['auth', 'rol:admin,calidad,asistente,jefe_produccion,despacho
 
     Route::middleware('seccion:dashboard')->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-        Route::get('acopios', fn () => redirect()->route('admin.dashboard'))->name('acopios');
+        Route::get('acopios', [\App\Http\Controllers\Web\AcopioWebController::class, 'index'])->name('acopios');
     });
 
     Route::middleware('seccion:produccion')->group(function () {
@@ -139,12 +134,15 @@ Route::middleware(['auth', 'rol:admin,calidad,asistente,jefe_produccion,despacho
         Route::get('inventario',                              [InsumoController::class, 'index'])->name('inventario.index');
         Route::post('inventario/ingreso',                     [InsumoController::class, 'ingreso'])->name('inventario.ingreso');
         Route::get('inventario/{insumo}/movimientos',         [InsumoController::class, 'movimientos'])->name('inventario.movimientos');
+        Route::get('kardex/insumos',   [\App\Http\Controllers\Web\KardexController::class, 'insumos'])->name('kardex.insumos');
+        Route::get('kardex/productos', [\App\Http\Controllers\Web\KardexController::class, 'productos'])->name('kardex.productos');
     });    Route::middleware('seccion:ventas')->group(function () {
         Route::get('ventas',  [AdminDashboardController::class, 'ventas'])->name('ventas');
         Route::post('ventas', [AdminDashboardController::class, 'ventasStore'])->name('ventas.store');
         Route::post('ventas/{venta}/despacho', [AdminDashboardController::class, 'actualizarDespacho'])->name('ventas.despacho.update');
         Route::get('ventas/{venta}/comprobante', [AdminDashboardController::class, 'comprobanteVenta'])->name('ventas.comprobante');
         Route::post('ventas/{venta}/anular', [AdminDashboardController::class, 'anularVenta'])->name('ventas.anular');
+        Route::post('ventas/pedidos-web/{pedido}/estado', [AdminTiendaController::class, 'pedidosEstado'])->name('ventas.pedidos-web.estado');
     });
 
     Route::middleware('seccion:liquidaciones')->group(function () {
@@ -203,6 +201,12 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
         Route::get('operaciones/recorrido/{chofer}/datos', 'recorridoDatos')->name('operaciones.recorrido.datos');
         Route::get('zonas/mapa',                           'zonasMapa')->name('operaciones.zonas');
         Route::post('zonas/mapa/{ganadero}',               'zonasMapaGuardar')->name('operaciones.zonas.guardar');
+        Route::get('rutas/trazar',                         'trazarRutas')->name('operaciones.trazar');
+        Route::post('rutas/trazar/{zona}',                 'trazarRutasGuardar')->name('operaciones.trazar.guardar');
+        Route::post('rutas',                               'rutaCrear')->name('operaciones.rutas.crear');
+        Route::put('rutas/{zona}',                         'rutaActualizar')->whereNumber('zona')->name('operaciones.rutas.actualizar');
+        Route::post('rutas/{zona}/proveedores',            'rutaProveedores')->whereNumber('zona')->name('operaciones.rutas.proveedores');
+        Route::post('rutas/{zona}/chofer',                 'rutaChofer')->whereNumber('zona')->name('operaciones.rutas.chofer');
         Route::get('exportar',                             'exportar')->name('operaciones.exportar');
         Route::get('exportar/acopios.csv',                 'exportarAcopiosCsv')->name('operaciones.exportar.acopios');
         Route::get('exportar/acopios/imprimir',            'exportarAcopiosImprimir')->name('operaciones.exportar.acopios.imprimir');
@@ -220,9 +224,21 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
     Route::post('liquidaciones/{liquidacion}/confirmar', [LiquidacionController::class, 'confirmar'])->name('liquidaciones.confirmar');
     Route::post('liquidaciones/{liquidacion}/pagar',     [LiquidacionController::class, 'marcarPagada'])->name('liquidaciones.pagar');
 
+    Route::controller(\App\Http\Controllers\Web\PlanillaChoferController::class)->group(function () {
+        Route::get('planilla-choferes',                       'index')->name('planilla.index');
+        Route::post('planilla-choferes/generar',              'generar')->name('planilla.generar');
+        Route::get('planilla-choferes/exportar',              'exportar')->name('planilla.exportar');
+        Route::post('planilla-choferes/{planilla}/adelantos', 'adelantos')->name('planilla.adelantos');
+        Route::post('planilla-choferes/{planilla}/pagar',     'pagar')->name('planilla.pagar');
+        Route::get('planilla-choferes/{planilla}/boleta',     'boleta')->name('planilla.boleta');
+        Route::post('costo-leche/recalcular',                 'recalcularCostoLeche')->name('costo-leche.recalcular');
+    });
+
     Route::get('rotacion',                     [RotacionController::class, 'index'])->name('rotacion.index');
     Route::post('rotacion/generar-automatico', [RotacionController::class, 'generarAutomatico'])->name('rotacion.generar');
     Route::post('rotacion/asignar-manual',     [RotacionController::class, 'asignarManual'])->name('rotacion.asignar');
+    Route::post('rotacion/segunda-ruta',       [RotacionController::class, 'segundaRuta'])->name('rotacion.segunda');
+    Route::post('rotacion/cubrir-libres',      [RotacionController::class, 'cubrirLibres'])->name('rotacion.cubrir');
     Route::delete('rotacion/{asignacion}',     [RotacionController::class, 'destruir'])->name('rotacion.destruir');
 
     Route::post('ganaderos',                         [GanaderoController::class, 'store'])->name('ganaderos.store');
@@ -233,6 +249,7 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
     Route::get('usuarios',                             [UsuarioController::class, 'index'])->name('usuarios.index');
     Route::post('usuarios',                            [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::post('usuarios/{usuario}/toggle',           [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
+    Route::post('usuarios/{usuario}/accesos',          [UsuarioController::class, 'accesos'])->name('usuarios.accesos');
     Route::post('usuarios/{usuario}/cambiar-password', [UsuarioController::class, 'cambiarPassword'])->name('usuarios.password');
 
     Route::get('configuracion',  [ConfiguracionController::class, 'index'])->name('configuracion.index');
@@ -251,6 +268,16 @@ Route::middleware(['auth', 'rol:admin,calidad', '2fa'])
     Route::middleware('seccion:calidad_plan')->group(function () {
         Route::post('calidad/plan', [PlanCalidadController::class, 'store'])->name('calidad.plan.store');
         Route::post('calidad/plan/{plan}/ejecutado', [PlanCalidadController::class, 'marcarEjecutado'])->name('calidad.plan.ejecutado');
+
+        // Control de calidad sorpresa (confidencial: los choferes no ven esta sección)
+        Route::controller(\App\Http\Controllers\Web\ControlSorpresaController::class)->group(function () {
+            Route::get('calidad/control', 'index')->name('calidad.control.index');
+            Route::post('calidad/control/sortear', 'sortear')->name('calidad.control.sortear');
+            Route::post('calidad/control/programar', 'programar')->name('calidad.control.programar');
+            Route::post('calidad/control/{control}/resultado', 'resultado')->name('calidad.control.resultado');
+            Route::post('calidad/control/{control}/cancelar', 'cancelar')->name('calidad.control.cancelar');
+            Route::post('calidad/control/ganadero/{ganadero}/desbloquear', 'desbloquear')->name('calidad.control.desbloquear');
+        });
     });
     Route::middleware('seccion:calidad_planta')->group(function () {
         Route::post('calidad/planta', [CalidadPlantaController::class, 'store'])->name('calidad.planta.store');

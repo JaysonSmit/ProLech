@@ -134,7 +134,7 @@ class OperacionesController extends Controller
     public function recorrido(Request $request): View
     {
         $fecha = Carbon::parse($request->query('fecha', now()->toDateString()));
-        $choferes = User::where('rol', 'chofer')->orderBy('name')->get(['id', 'name']);
+        $choferes = User::conRol('chofer')->orderBy('name')->get(['id', 'name']);
 
         // Km del día por chofer (todos los que enviaron puntos)
         $kmPorChofer = TrackingGpsPunto::whereDate('registrado_en', $fecha->toDateString())
@@ -211,7 +211,7 @@ class OperacionesController extends Controller
 
     public function zonasMapa(): View
     {
-        $zonas = Zona::where('activa', true)->orderBy('orden')->get(['id', 'nombre', 'codigo', 'poligono', 'color']);
+        $zonas = Zona::where('activa', true)->orderBy('orden')->get(['id', 'nombre', 'codigo', 'poligono', 'color', 'trazado', 'trazado_km']);
         $ganaderos = Ganadero::where('activo', true)->orderBy('nombre')
             ->get(['id', 'nombre', 'dni', 'direccion', 'zona_id', 'geo_lat', 'geo_lon', 'estado']);
 
@@ -236,8 +236,10 @@ class OperacionesController extends Controller
         if ($request->filled('geo_lat')) {
             $cambios['geo_lat'] = round((float) $validated['geo_lat'], 7);
             $cambios['geo_lon'] = round((float) $validated['geo_lon'], 7);
-            // Ubicado dentro del polígono de una zona y sin zona elegida a mano → se asigna esa zona
-            if (! $request->has('zona_id')) {
+            // Se le asigna la zona cuyo polígono lo contiene, salvo que su ruta actual no tenga
+            // polígono (rutas creadas en «Rutas y choferes», como HUATA1): esa la eligió el admin a mano
+            $rutaManual = $ganadero->zona_id && empty(Zona::whereKey($ganadero->zona_id)->value('poligono'));
+            if (! $request->has('zona_id') && ! $rutaManual) {
                 $zona = Zona::deUbicacion($cambios['geo_lat'], $cambios['geo_lon']);
                 if ($zona) $cambios['zona_id'] = $zona->id;
             }
@@ -248,6 +250,216 @@ class OperacionesController extends Controller
             'message'  => "Ganadero {$ganadero->nombre} actualizado.",
             'ganadero' => $ganadero->only(['id', 'nombre', 'zona_id', 'geo_lat', 'geo_lon']),
         ]);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    // 13b. RUTAS: crear rutas, elegir sus proveedores y su chofer, trazar el camino
+    // ══════════════════════════════════════════════════════════════════════
+
+    public function trazarRutas(): View
+    {
+        $zonas = Zona::where('activa', true)->orderBy('orden')
+            ->get(['id', 'nombre', 'codigo', 'poligono', 'color', 'trazado', 'trazado_km']);
+        $ganaderos = Ganadero::where('activo', true)->orderBy('nombre')
+            ->get(['id', 'nombre', 'dni', 'zona_id', 'geo_lat', 'geo_lon', 'estado']);
+
+        return view('admin.operaciones.trazar-rutas', [
+            'zonas'     => $zonas,
+            'ganaderos' => $ganaderos,
+            'paradas'   => $zonas->mapWithKeys(fn (Zona $z) => [$z->id => $this->paradasDeZona($z)]),
+            'choferes'  => User::conRol('chofer')->where('activo', true)->orderBy('name')->get(['id', 'name']),
+            'titulares' => $this->titularesDelMes(),
+            'mes'       => now()->month,
+            'anio'      => now()->year,
+            'planta'    => app(RutaChoferService::class)->planta(),
+        ]);
+    }
+
+    /** Notificación al chofer titular de la ruta este mes (queda en sus notificaciones). */
+    private function avisarChofer(Zona $zona, string $mensaje): void
+    {
+        $choferId = AsignacionZona::choferDeZona($zona->id);
+        if ($choferId) {
+            \App\Models\Notificacion::enviar(
+                userId: $choferId, titulo: '🔄 Cambió tu ruta', mensaje: $mensaje, tipo: 'ruta_cambiada', referenciaId: $zona->id,
+            );
+        }
+    }
+
+    /** zona_id → chofer titular del mes actual. */
+    private function titularesDelMes(): array
+    {
+        $asig = AsignacionZona::with('chofer:id,name')->where('mes', now()->month)->where('anio', now()->year)->get();
+        // Primero las segundas rutas para que el titular (si lo hay) las sobrescriba
+        return $asig->whereNotNull('zona_extra_id')
+            ->mapWithKeys(fn ($a) => [$a->zona_extra_id => ['id' => $a->chofer_id, 'nombre' => $a->chofer?->name . ' (2.ª ruta)']])
+            ->union($asig->whereNotNull('zona_id')->mapWithKeys(fn ($a) => [$a->zona_id => ['id' => $a->chofer_id, 'nombre' => $a->chofer?->name]]))
+            ->all();
+    }
+
+    /** POST /admin/rutas: crea una ruta nueva (zona) vacía. */
+    public function rutaCrear(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'nombre' => ['required', 'string', 'max:100', 'unique:zonas,nombre'],
+            'color'  => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+        ], ['nombre.unique' => 'Ya existe una ruta con ese nombre.']);
+
+        // Código único derivado del nombre: "Collana 5" → COLLANA-5
+        $base = substr(strtoupper(\Illuminate\Support\Str::slug($validated['nombre'])), 0, 16) ?: 'RUTA';
+        $codigo = $base;
+        for ($i = 2; Zona::where('codigo', $codigo)->exists(); $i++) {
+            $codigo = substr($base, 0, 16) . '-' . $i;
+        }
+
+        $zona = Zona::create([
+            'codigo' => $codigo,
+            'nombre' => $validated['nombre'],
+            'color'  => $validated['color'] ?? null,
+            'orden'  => (int) Zona::max('orden') + 1,
+            'activa' => true,
+        ]);
+
+        return response()->json([
+            'message' => "Ruta {$zona->nombre} creada. Ahora agrega sus proveedores y su chofer.",
+            'zona'    => $zona->only(['id', 'nombre', 'codigo', 'poligono', 'color', 'trazado', 'trazado_km']),
+        ], 201);
+    }
+
+    /** PUT /admin/rutas/{zona}: renombrar, cambiar color o desactivar la ruta. */
+    public function rutaActualizar(Request $request, Zona $zona): JsonResponse
+    {
+        $validated = $request->validate([
+            'nombre' => ['sometimes', 'required', 'string', 'max:100', \Illuminate\Validation\Rule::unique('zonas', 'nombre')->ignore($zona->id)],
+            'color'  => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'activa' => ['sometimes', 'boolean'],
+        ], ['nombre.unique' => 'Ya existe una ruta con ese nombre.']);
+
+        if (($validated['activa'] ?? true) === false) {
+            $proveedores = Ganadero::where('zona_id', $zona->id)->where('activo', true)->count();
+            if ($proveedores > 0) {
+                return response()->json(['message' => "La ruta aún tiene {$proveedores} proveedor(es). Muévelos a otra ruta antes de eliminarla."], 422);
+            }
+            // Su chofer de este mes en adelante queda como volante
+            AsignacionZona::where('zona_id', $zona->id)
+                ->where(fn ($q) => $q->where('anio', '>', now()->year)
+                    ->orWhere(fn ($q2) => $q2->where('anio', now()->year)->where('mes', '>=', now()->month)))
+                ->update(['zona_id' => null, 'rol_mes' => 'volante']);
+        }
+
+        $zona->update($validated);
+
+        return response()->json([
+            'message' => $zona->activa ? "Ruta {$zona->nombre} actualizada." : "Ruta {$zona->nombre} eliminada.",
+            'zona'    => $zona->only(['id', 'nombre', 'codigo', 'color', 'activa']),
+        ]);
+    }
+
+    /** POST /admin/rutas/{zona}/proveedores: agrega o quita proveedores de la ruta. */
+    public function rutaProveedores(Request $request, Zona $zona): JsonResponse
+    {
+        $validated = $request->validate([
+            'ganadero_ids'   => ['required', 'array', 'min:1'],
+            'ganadero_ids.*' => ['integer', 'exists:ganaderos,id'],
+            'accion'         => ['required', \Illuminate\Validation\Rule::in(['agregar', 'quitar'])],
+        ]);
+
+        $query = Ganadero::whereIn('id', $validated['ganadero_ids']);
+        if ($validated['accion'] === 'quitar') {
+            $query->where('zona_id', $zona->id)->update(['zona_id' => null]);
+        } else {
+            $query->update(['zona_id' => $zona->id]);
+        }
+
+        $n = count($validated['ganadero_ids']);
+        $nombres = Ganadero::whereIn('id', $validated['ganadero_ids'])->pluck('nombre')->implode(', ');
+        $this->avisarChofer($zona, $validated['accion'] === 'agregar'
+            ? "Se agregó a tu ruta {$zona->nombre}: {$nombres}."
+            : "Ya no visitas en {$zona->nombre}: {$nombres}.");
+        return response()->json([
+            'message'   => $validated['accion'] === 'agregar'
+                ? "{$n} proveedor(es) agregado(s) a {$zona->nombre}."
+                : "{$n} proveedor(es) quitado(s) de {$zona->nombre}.",
+            'paradas'   => $this->paradasDeZona($zona),
+            'ganaderos' => Ganadero::whereIn('id', $validated['ganadero_ids'])->get(['id', 'zona_id'])->all(),
+        ]);
+    }
+
+    /** POST /admin/rutas/{zona}/chofer: chofer titular de la ruta este mes (null = sin chofer). */
+    public function rutaChofer(Request $request, Zona $zona): JsonResponse
+    {
+        $validated = $request->validate([
+            'chofer_id' => ['nullable', 'integer', function ($campo, $valor, $falla) {
+                if ($valor !== null && ! User::conRol('chofer')->whereKey($valor)->exists()) $falla('El usuario elegido no es chofer.');
+            }],
+        ]);
+        $mes = now()->month;
+        $anio = now()->year;
+
+        if ($validated['chofer_id']) {
+            $intercambio = AsignacionZona::asignar((int) $validated['chofer_id'], $zona->id, $mes, $anio);
+            $nombre = User::find($validated['chofer_id'])->name;
+            $mensaje = "{$nombre} recorrerá {$zona->nombre} este mes." . ($intercambio ? " Intercambio: {$intercambio}." : '');
+            $this->avisarChofer($zona, "Desde hoy tu ruta es {$zona->nombre}. Abre «Mi ruta» para ver tus proveedores.");
+        } else {
+            AsignacionZona::where('zona_id', $zona->id)->where('mes', $mes)->where('anio', $anio)
+                ->update(['zona_id' => null, 'rol_mes' => 'volante']);
+            $mensaje = "{$zona->nombre} quedó sin chofer este mes; el anterior pasa a volante.";
+        }
+
+        return response()->json(['message' => $mensaje, 'titulares' => $this->titularesDelMes()]);
+    }
+
+    /** POST /admin/rutas/trazar/{zona}: guarda (o borra, con trazado vacío) el camino de la zona. */
+    public function trazarRutasGuardar(Request $request, Zona $zona): JsonResponse
+    {
+        $validated = $request->validate([
+            'trazado'     => ['present', 'array', 'max:5000'],
+            'trazado.*'   => ['array', 'size:2'],
+            'trazado.*.0' => ['numeric', 'between:-90,90'],
+            'trazado.*.1' => ['numeric', 'between:-180,180'],
+        ]);
+
+        $puntos = array_map(fn ($p) => [round((float) $p[0], 6), round((float) $p[1], 6)], $validated['trazado']);
+        if (count($puntos) === 1) {
+            return response()->json(['message' => 'El trazado necesita al menos dos puntos.'], 422);
+        }
+
+        $zona->update([
+            'trazado'    => $puntos ?: null,
+            'trazado_km' => $puntos ? Zona::largoKm($puntos) : null,
+        ]);
+        $this->avisarChofer($zona, $puntos
+            ? "La planta trazó el camino de {$zona->nombre} ({$zona->trazado_km} km). Míralo en «Mi ruta»."
+            : "La planta quitó el camino trazado de {$zona->nombre}.");
+
+        return response()->json([
+            'message'    => $puntos
+                ? "Ruta de {$zona->nombre} guardada ({$zona->trazado_km} km). La app del chofer la usará al actualizar su ruta."
+                : "Se borró el trazado de {$zona->nombre}: la app volverá a sugerir el camino automáticamente.",
+            'trazado_km' => $zona->trazado_km,
+            'paradas'    => $this->paradasDeZona($zona->fresh()),
+        ]);
+    }
+
+    /** Ganaderos de la zona en el orden en que el chofer los visitará, con su distancia al trazado. */
+    private function paradasDeZona(Zona $zona): array
+    {
+        $ganaderos = Ganadero::where('activo', true)->where('zona_id', $zona->id)
+            ->get(['id', 'nombre', 'geo_lat', 'geo_lon', 'estado']);
+        $ordenados = $zona->tieneTrazado() ? RutaChoferService::ordenarPorTrazado($ganaderos, $zona) : $ganaderos->sortBy('nombre');
+
+        return $ordenados->values()->map(function (Ganadero $g, int $i) use ($zona) {
+            $pos = $g->geo_lat !== null ? $zona->posicionEnTrazado((float) $g->geo_lat, (float) $g->geo_lon) : null;
+            return [
+                'id'      => $g->id,
+                'orden'   => $i + 1,
+                'nombre'  => $g->nombre,
+                'sin_gps' => $g->geo_lat === null,
+                'km'      => $pos[0] ?? null,
+                'lejos_m' => $pos[1] ?? null,
+            ];
+        })->all();
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -277,7 +489,7 @@ class OperacionesController extends Controller
 
         $clasicos = Acopio::with('ganadero:id,nombre,dni,zona_id')
             ->whereNull('acopio_campo_id')   // los de campo se suman abajo
-            ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
+            ->whereDate('fecha', '>=', $desde)->whereDate('fecha', '<=', $hasta)
             ->get()
             ->map(fn ($a) => [
                 'Fecha'      => Carbon::parse($a->fecha)->format('d/m/Y'),

@@ -20,6 +20,9 @@ class AcopioCampo extends Model
         'actualizado_en',
         'grasa',
         'foto_path',
+        'observacion',
+        'observacion_nota',
+        'muestra_codigo',
     ];
 
     protected $casts = [
@@ -61,6 +64,9 @@ class AcopioCampo extends Model
             'actualizado_en'  => $this->actualizado_en,
             'grasa'           => $this->grasa,
             'foto_url'        => $this->foto_path ? asset('storage/' . $this->foto_path) : null,
+            'observacion'      => $this->observacion,
+            'observacion_nota' => $this->observacion_nota,
+            'muestra_codigo'   => $this->muestra_codigo,
         ];
     }
 }

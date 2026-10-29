@@ -88,7 +88,7 @@ class ComunicadoController extends Controller
 
         // Notificar internamente a choferes y personal de planta
         $usuariosInternos = User::where('activo', true)
-            ->whereIn('rol', ['admin', 'chofer', 'calidad', 'asistente', 'jefe_produccion'])
+            ->conRol('admin', 'chofer', 'calidad', 'asistente', 'jefe_produccion')
             ->where('id', '!=', $request->user()->id)
             ->get();
 

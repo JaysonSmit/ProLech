@@ -27,7 +27,17 @@ class ProduccionLoteController extends Controller
             ->orderByDesc('id')
             ->paginate(15);
 
-        return view('admin.produccion.create', compact('recetas', 'lotes'));
+        // Unidades de cada lote que siguen en la tienda (sale primero lo que vence antes)
+        $stockLotes = app(\App\Services\StockLotes::class);
+        $enTienda = [];
+        foreach (\App\Models\ProductoTienda::whereNotNull('receta_id')->get() as $p) {
+            foreach ($stockLotes->desglose($p->receta_id, $p->stock_disponible) as $f) {
+                $enTienda[$f['lote']->id] = $f['en_stock'];
+            }
+        }
+        $porVencer = $stockLotes->porVencer();
+
+        return view('admin.produccion.create', compact('recetas', 'lotes', 'enTienda', 'porVencer'));
     }
 
     // ── POST /admin/produccion/lotes ──────────────────────────────────────────

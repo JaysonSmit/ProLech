@@ -35,7 +35,10 @@ class AdminTiendaController extends Controller
     /** GET /admin/tienda/productos/create */
     public function productosCreate(): View
     {
-        $recetas = Receta::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
+        // Con costo y precio sugerido para la ayuda del formulario
+        $recetas = Receta::where('activa', true)->with('detalles.insumo')->orderBy('nombre')->get()
+            ->each(fn (Receta $r) => $r->setAttribute('costo', $r->costoUnitario())->setAttribute('sugerido', $r->precioSugerido())
+                ->setAttribute('producido', app(\App\Services\StockLotes::class)->disponibleProducido($r->id)));
 
         return view('admin.tienda.productos.create', compact('recetas'));
     }
@@ -48,11 +51,18 @@ class AdminTiendaController extends Controller
             'slug'             => ['nullable', 'string', 'max:160', 'unique:productos_tienda,slug'],
             'descripcion'      => ['nullable', 'string', 'max:2000'],
             'precio_venta'     => ['required', 'numeric', 'min:0.01'],
-            'stock_disponible' => ['required', 'integer', 'min:0'],
+            'stock_disponible' => ['nullable', 'integer', 'min:0'],
             'estado'           => ['required', Rule::in(['activo', 'inactivo'])],
             'receta_id'        => ['nullable', 'integer', 'exists:recetas,id'],
             'imagen'           => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
         ]);
+
+        // Con receta y sin stock escrito: entra lo producido que sigue vigente en sus lotes
+        if (($validated['stock_disponible'] ?? null) === null) {
+            $validated['stock_disponible'] = ! empty($validated['receta_id'])
+                ? app(\App\Services\StockLotes::class)->disponibleProducido((int) $validated['receta_id'])
+                : 0;
+        }
 
         // Subir imagen al disco público si viene
         $validated['imagen_url'] = null;
@@ -76,9 +86,17 @@ class AdminTiendaController extends Controller
     /** GET /admin/tienda/productos/{producto}/edit */
     public function productosEdit(ProductoTienda $producto): View
     {
-        $recetas = Receta::where('activa', true)->orderBy('nombre')->get(['id', 'nombre']);
+        $recetas = Receta::where('activa', true)->with('detalles.insumo')->orderBy('nombre')->get()
+            ->each(function (Receta $r) {
+                $r->setAttribute('costo', $r->costoUnitario());
+                $r->setAttribute('sugerido', $r->precioSugerido());
+            });
 
-        return view('admin.tienda.productos.edit', compact('producto', 'recetas'));
+        $desglose = $producto->receta_id
+            ? app(\App\Services\StockLotes::class)->desglose($producto->receta_id, $producto->stock_disponible)
+            : collect();
+
+        return view('admin.tienda.productos.edit', compact('producto', 'recetas', 'desglose'));
     }
 
     /** PUT /admin/tienda/productos/{producto} */
@@ -186,7 +204,8 @@ class AdminTiendaController extends Controller
     public function pedidosEstado(Request $request, PedidoWeb $pedido): RedirectResponse
     {
         $request->validate([
-            'estado_pedido' => ['required', Rule::in(['Pendiente', 'Pagado', 'Enviado', 'Cancelado'])],
+            'estado_pedido'  => ['required', Rule::in(['Pendiente', 'Pagado', 'Enviado', 'Entregado', 'Cancelado'])],
+            'notas_despacho' => ['nullable', 'string', 'max:250'],
         ]);
 
         $anterior = $pedido->estado_pedido;
@@ -208,7 +227,12 @@ class AdminTiendaController extends Controller
                 }
                 $pedido->moverStock(-1);
             }
-            $pedido->update(['estado_pedido' => $nuevo]);
+            $pedido->update(array_filter([
+                'estado_pedido'  => $nuevo,
+                'despachado_at'  => $nuevo === 'Enviado' && ! $pedido->despachado_at ? now() : null,
+                'entregado_at'   => $nuevo === 'Entregado' ? now() : null,
+                'notas_despacho' => request('notas_despacho') ?: null,
+            ], fn ($v) => $v !== null));
         });
 
         // Aviso automático al cliente (Ultramsg; sin credenciales solo se registra en el log)
@@ -218,7 +242,7 @@ class AdminTiendaController extends Controller
 
         return back()->with(
             'success',
-            "✅ Pedido {$pedido->codigo_pedido} marcado como {$nuevo}. Se avisó al cliente por WhatsApp."
+            "✅ Pedido {$pedido->codigo_pedido} marcado como " . $pedido->fresh()->estado_badge['label'] . '. Se avisó al cliente por WhatsApp.'
         );
     }
 

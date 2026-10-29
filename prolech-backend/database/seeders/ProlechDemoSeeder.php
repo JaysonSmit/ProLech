@@ -53,6 +53,7 @@ class ProlechDemoSeeder extends Seeder
         $this->historialAcopios($ganaderos, $zonas, $choferes);
         $this->rutaDeHoy($ganaderos, $zonas, $choferes);
         $this->liquidaciones();
+        $this->planillaChoferes();
         $productos = $this->produccionYTienda();
         $this->pedidos($productos);
 
@@ -226,24 +227,37 @@ class ProlechDemoSeeder extends Seeder
             $this->crearHistorial($ganaderos, $zonas, $choferes, $suspendido);
         }
 
+        // La semana de liquidación de los dos strikes (jueves a miércoles)
+        $inicio = \App\Models\Liquidacion::inicioSemana(now()->subDays(max(self::diasStrike())));
         $strikes = Acopio::where('ganadero_id', Ganadero::where('dni', $suspendido)->value('id'))
             ->whereIn('estado', ['rechazado', 'observado'])
-            ->whereBetween('fecha', Acopio::rangoSemanaLiquidacion())->count();
+            ->whereDate('fecha', '>=', $inicio)->whereDate('fecha', '<=', $inicio->copy()->addDays(6))->count();
         if ($strikes >= 2) {
             Ganadero::where('dni', $suspendido)->first()->suspender();
         }
     }
 
+    /**
+     * Días atrás de las dos lecturas adulteradas: deben caer en la MISMA semana de liquidación.
+     * Antes eran siempre ayer y anteayer «de esta semana», y los jueves (semana recién empezada)
+     * no había strikes y el ganadero no quedaba suspendido.
+     */
+    private static function diasStrike(): array
+    {
+        // Viernes: ayer fue jueves (otra semana que anteayer) → se usan miércoles y martes
+        return now()->subDay()->isThursday() ? [2, 3] : [1, 2];
+    }
+
     private function crearHistorial(array $ganaderos, array $zonas, array $choferes, string $suspendido): void
     {
         $codigos = array_keys($zonas);
-        [$inicioSemana] = Acopio::rangoSemanaLiquidacion();
+        $diasStrike = self::diasStrike();
 
         for ($d = 14; $d >= 1; $d--) {
             $fecha = now()->subDays($d);
             foreach ($codigos as $iz => $codigo) {
                 foreach ($ganaderos[$codigo] as $ig => $g) {
-                    $esStrike = $g->dni === $suspendido && $fecha->gte($inicioSemana) && in_array($d, [1, 2], true);
+                    $esStrike = $g->dni === $suspendido && in_array($d, $diasStrike, true);
                     if (! $esStrike && mt_rand(1, 100) <= 8) continue;   // a veces no entrega
 
                     [$agua, $ph] = [round(mt_rand(5, 30) / 10, 1), round(mt_rand(64, 68) / 10, 1)];
@@ -251,7 +265,7 @@ class ProlechDemoSeeder extends Seeder
                     if ($sorteo <= 7)       [$agua, $ph] = [round(mt_rand(55, 85) / 10, 1), 6.5];   // observado
                     elseif ($sorteo <= 9)   [$agua, $ph] = [round(mt_rand(105, 140) / 10, 1), 6.4]; // rechazado
 
-                    if ($esStrike) [$agua, $ph] = [$d === 1 ? 11.5 : 7.2, 6.4];
+                    if ($esStrike) [$agua, $ph] = [$d === $diasStrike[0] ? 11.5 : 7.2, 6.4];
 
                     $densidad = round(1.028 + mt_rand(5, 45) / 10000, 4);
                     $litros   = round(mt_rand(150, 750) / 10, 1);
@@ -366,6 +380,30 @@ class ProlechDemoSeeder extends Seeder
         }
     }
 
+    // ── Planilla de choferes ──────────────────────────────────────────────
+
+    /** Últimas 4 semanas: las pasadas pagadas, la actual en borrador. Luego el costo real por litro. */
+    private function planillaChoferes(): void
+    {
+        $servicio = app(\App\Services\PlanillaChoferService::class);
+        $admin = User::where('rol', 'admin')->first();
+        $metodos = ['efectivo', 'yape', 'transferencia'];
+
+        for ($s = 3; $s >= 0; $s--) {
+            [$desde, $hasta] = \App\Services\PlanillaChoferService::periodo('semanal', now()->subWeeks($s));
+            if (\App\Models\PlanillaChofer::whereDate('periodo_inicio', $desde)->exists()) continue;
+
+            foreach ($servicio->generar('semanal', $desde, $hasta, $admin?->id) as $i => $planilla) {
+                if ($i === 1) $servicio->actualizarAdelantos($planilla, 50.0);   // un adelanto de ejemplo
+                if ($s > 0) {
+                    $servicio->pagar($planilla->fresh(), $metodos[$i % 3], $metodos[$i % 3] === 'efectivo' ? null : 'OP-' . (4100 + $s * 10 + $i));
+                    $planilla->update(['pagada_at' => $hasta->copy()->addDays(2)->setTime(17, 0)]);
+                }
+            }
+        }
+        app(\App\Services\CostoLecheService::class)->aplicarAInsumo();
+    }
+
     // ── Producción y tienda ───────────────────────────────────────────────
 
     /** @return ProductoTienda[] */
@@ -402,7 +440,11 @@ class ProlechDemoSeeder extends Seeder
             if (! $yaProducida && $receta->detalles()->exists()) {
                 try {
                     $lote = $produccion->registrarLote($receta->id, $unidades, $responsable, 'demo: lote de la semana');
-                    $lote->update(['fecha_produccion' => now()->subDays(mt_rand(1, 4))->toDateString()]);
+                    $fecha = now()->subDays(mt_rand(1, 4))->toDateString();
+                    $lote->update([
+                        'fecha_produccion'  => $fecha,
+                        'fecha_vencimiento' => \App\Services\StockLotes::fechaVencimiento($fecha, (int) ($receta->dias_vida_util ?: 15)),
+                    ]);
                 } catch (\RuntimeException $e) {
                     $this->command?->warn("   ⚠ {$nombreReceta}: {$e->getMessage()}");
                 }

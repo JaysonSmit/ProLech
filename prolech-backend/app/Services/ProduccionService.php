@@ -101,7 +101,7 @@ class ProduccionService
                     'insumo'     => $detalle->insumo,
                     'cantidad'   => $cantidadNecesaria,
                     'costo_parcial' => round(
-                        $cantidadNecesaria * (float) $detalle->insumo->costo_unitario,
+                        $cantidadNecesaria * $detalle->insumo->costoVigente(),
                         4
                     ),
                 ];
@@ -161,6 +161,8 @@ class ProduccionService
                 'codigo_lote'        => $codigoLote,
                 'receta_id'          => $receta->id,
                 'fecha_produccion'   => $fechaHoy,
+                // Vence según la vida útil de la receta (Queso Fresco 7 días, Paria 30…)
+                'fecha_vencimiento'  => StockLotes::fechaVencimiento($fechaHoy, (int) ($receta->dias_vida_util ?: 15)),
                 'cantidad_producida' => $cantidadProducida,
                 'costo_total'        => round($costoTotal, 2),
                 'responsable_id'     => $responsable->id,
@@ -243,8 +245,8 @@ class ProduccionService
                 'nombre'            => $detalle->insumo->nombre,
                 'unidad_medida'     => $detalle->insumo->unidad_medida,
                 'cantidad_necesaria' => $cantidadNecesaria,
-                'costo_unitario'    => (float) $detalle->insumo->costo_unitario,
-                'costo_parcial'     => round($cantidadNecesaria * (float) $detalle->insumo->costo_unitario, 2),
+                'costo_unitario'    => $detalle->insumo->costoVigente(),
+                'costo_parcial'     => round($cantidadNecesaria * $detalle->insumo->costoVigente(), 2),
                 'stock_actual'      => $stockActual,
                 'alcanza'           => $alcanza,
                 'faltante'          => $alcanza ? 0 : round($cantidadNecesaria - $stockActual, 4),

@@ -93,8 +93,8 @@
             <h3>Estado del pedido</h3>
             <div class="timeline">
                 <div class="tl on"><div class="dot">✓</div>Recibido</div>
-                <div class="tl {{ in_array($pedido->estado_pedido, ['Pagado', 'Enviado']) ? 'on' : '' }}"><div class="dot">💳</div>Pago confirmado</div>
-                <div class="tl {{ $pedido->estado_pedido === 'Enviado' ? 'on' : '' }}"><div class="dot">🚚</div>En camino</div>
+                <div class="tl {{ in_array($pedido->estado_pedido, ['Pagado', 'Enviado', 'Entregado']) ? 'on' : '' }}"><div class="dot">💳</div>Pago confirmado</div>
+                <div class="tl {{ in_array($pedido->estado_pedido, ['Enviado', 'Entregado']) ? 'on' : '' }}"><div class="dot">🚚</div>En camino</div>
             </div>
         </div>
 

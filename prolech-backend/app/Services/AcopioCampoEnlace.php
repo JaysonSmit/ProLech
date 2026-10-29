@@ -38,6 +38,9 @@ class AcopioCampoEnlace
             'estado'          => strtolower($campo->estado_calidad),
             'tiene_descuento' => Acopio::calcularDescuento($agua),
             'foto_evidencia'  => $campo->foto_path,
+            'observacion'      => $campo->observacion,
+            'observacion_nota' => $campo->observacion_nota,
+            'muestra_codigo'   => $campo->muestra_codigo,
         ];
 
         $acopio = Acopio::where('acopio_campo_id', $campo->id)->first();
@@ -59,7 +62,8 @@ class AcopioCampoEnlace
         ]);
         $acopio->created_at = $registrado;   // la hora real del acopio, no la de la sincronización
         $acopio->save();
-        $this->adulteracion->evaluar($acopio);   // regla de 2 strikes, igual que la app clásica
+        $this->adulteracion->evaluar($acopio);   // regla de 2 strikes (solo versiones antiguas que aún miden)
+        app(ControlCalidadService::class)->alRegistrarAcopio($acopio);   // frasco de muestra y observación del chofer
 
         return $acopio;
     }

@@ -121,4 +121,32 @@ class ChoferApiTest extends TestCase
              ->assertOk()
              ->assertJsonPath('total', 0);
     }
+
+    public function test_reunion_creada_por_el_admin_llega_al_chofer(): void
+    {
+        $admin  = User::factory()->create(['rol' => 'admin', 'activo' => true]);
+        $chofer = $this->chofer();
+
+        $this->actingAs($admin)->withSession(['2fa_verified' => true])
+             ->post('/admin/reuniones', [
+                 'titulo' => 'Capacitación de higiene', 'tipo' => 'capacitacion',
+                 'fecha_hora' => now()->addDays(2)->format('Y-m-d H:i'), 'lugar' => 'Planta',
+             ])->assertRedirect();
+
+        Sanctum::actingAs($chofer);
+        $this->getJson('/api/notificaciones')
+             ->assertOk()
+             ->assertJsonPath('total_no_leidas', 1)
+             ->assertJsonPath('notificaciones.0.tipo', 'reunion')
+             ->assertJsonPath('notificaciones.0.leida', false);
+        $this->getJson('/api/reuniones')->assertOk()->assertJsonPath('total', 1)
+             ->assertJsonPath('reuniones.0.titulo', 'Capacitación de higiene');
+
+        // Leída: sale del contador pero sigue en la bandeja (?todas=1)
+        $id = $this->getJson('/api/notificaciones')->json('notificaciones.0.id');
+        $this->postJson("/api/notificaciones/{$id}/leer")->assertOk();
+        $this->getJson('/api/notificaciones')->assertJsonPath('total_no_leidas', 0)->assertJsonCount(0, 'notificaciones');
+        $this->getJson('/api/notificaciones?todas=1')->assertJsonCount(1, 'notificaciones')
+             ->assertJsonPath('notificaciones.0.leida', true);
+    }
 }

@@ -46,7 +46,7 @@
 
     @if($pedido)
         @php
-            $orden = ['Pendiente' => 1, 'Pagado' => 2, 'Enviado' => 3];
+            $orden = ['Pendiente' => 1, 'Pagado' => 2, 'Enviado' => 3, 'Entregado' => 4];
             $nivel = $orden[$pedido->estado_pedido] ?? 0;
             $cancelado = $pedido->estado_pedido === 'Cancelado';
         @endphp
@@ -66,7 +66,7 @@
                     <div class="paso on"><div class="bola">✓</div>Recibido</div>
                     <div class="paso {{ $nivel >= 2 ? 'on' : '' }}"><div class="bola">💳</div>Pago confirmado</div>
                     <div class="paso {{ $nivel >= 3 ? 'on' : '' }}"><div class="bola">🚚</div>En camino</div>
-                    <div class="paso {{ $nivel >= 3 ? 'on' : '' }}"><div class="bola">🏠</div>Entrega</div>
+                    <div class="paso {{ $nivel >= 4 ? 'on' : '' }}"><div class="bola">🏠</div>Entregado</div>
                 </div>
             @endif
 

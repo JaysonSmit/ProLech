@@ -99,18 +99,27 @@ class AcopioCampoController extends Controller
             'ganadero_id'     => ['required', 'integer', 'min:1'],
             'ganadero_nombre' => ['required', 'string', 'max:255'],
             'litros'          => ['required', 'numeric', 'min:0', 'max:99999'],
-            'porcentaje_agua' => ['required', 'numeric', 'min:0', 'max:100'],
-            'densidad'        => ['required', 'numeric', 'min:0', 'max:99'],
-            'estado_calidad'  => ['required', 'in:APROBADO,OBSERVADO,RECHAZADO'],
+            // El chofer ya no mide la calidad: estos campos solo llegan de versiones antiguas de la app
+            'porcentaje_agua' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'densidad'        => ['nullable', 'numeric', 'min:0', 'max:99'],
+            'estado_calidad'  => ['nullable', 'in:APROBADO,OBSERVADO,RECHAZADO'],
             'actualizado_en'  => ['required', 'integer', 'min:0'],
             'grasa'           => ['nullable', 'numeric', 'min:0', 'max:15'],
+            // Lo que ve a simple vista y el frasco si la app se lo pidió
+            'observacion'      => ['nullable', 'in:' . implode(',', array_keys(\App\Services\ControlCalidadService::OBSERVACIONES))],
+            'observacion_nota' => ['nullable', 'string', 'max:200'],
+            'muestra_codigo'   => ['nullable', 'string', 'max:20'],
         ];
 
         if ($conUuid) {
             $reglas['uuid'] = ['required', 'uuid'];
         }
 
-        return $request->validate($reglas);
+        $datos = $request->validate($reglas);
+        $datos['porcentaje_agua'] ??= 0;
+        $datos['densidad'] ??= 0;
+        $datos['estado_calidad'] ??= 'APROBADO';
+        return $datos;
     }
 
     /** UPSERT por uuid aplicando Last-Write-Wins. */

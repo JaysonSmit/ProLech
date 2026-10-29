@@ -33,7 +33,7 @@ class AuthController extends Controller
         }
 
         // Solo choferes y admin pueden usar la API móvil (en modo desarrollo debug se permiten todos para pruebas)
-        if (! in_array($user->rol, ['chofer', 'admin']) && ! config('app.debug')) {
+        if (! $user->tieneRol('chofer', 'admin') && ! config('app.debug')) {
             return response()->json(['message' => 'No autorizado para acceso API.'], 403);
         }
 
@@ -48,7 +48,9 @@ class AuthController extends Controller
                 'id'    => $user->id,
                 'name'  => $user->name,
                 'email' => $user->email,
-                'rol'   => $user->rol,
+                // La app de campo es de choferes: si el chofer es un acceso adicional, se informa como chofer
+                'rol'   => $user->rol !== 'admin' && $user->tieneRol('chofer') ? 'chofer' : $user->rol,
+                'roles' => $user->roles(),
             ],
         ]);
     }

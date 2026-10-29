@@ -32,7 +32,7 @@ class ChoferAppController extends Controller
         ]);
 
         $usuario = $request->user();
-        if ($usuario->rol !== 'admin') {
+        if (! $usuario->tieneRol('admin')) {
             $ruta = $rutas->rutaDe($usuario);
             $idsRuta = collect($ruta['paradas'] ?? [])->pluck('ganadero_id');
             if (! $idsRuta->contains($ganadero->id)) {
@@ -195,16 +195,16 @@ class ChoferAppController extends Controller
             ], 422);
         }
 
-        // Obtener la ruta actual del chofer desde su último acopio real
-        // (orden por fecha de acopio + hora de registro, no por updated_at del ganadero)
+        // Ruta actual: la asignada este mes en «Rutas y choferes»; si no tiene, la de su último acopio
         $ultimoAcopio = \App\Models\Acopio::where('chofer_id', $chofer->id)
                                           ->orderByDesc('fecha')
                                           ->orderByDesc('created_at')
                                           ->first(['ganadero_id']);
 
-        $rutaActual = $ultimoAcopio
-            ? \App\Models\Ganadero::where('id', $ultimoAcopio->ganadero_id)->value('ruta_asignada') ?? 'Sin asignar'
-            : 'Sin asignar';
+        $rutaActual = \App\Models\AsignacionZona::rutaDelMes($chofer->id)
+            ?? ($ultimoAcopio
+                ? \App\Models\Ganadero::where('id', $ultimoAcopio->ganadero_id)->value('ruta_asignada') ?? 'Sin asignar'
+                : 'Sin asignar');
 
         $solicitud = SolicitudRuta::create([
             'chofer_id'       => $chofer->id,
@@ -272,15 +272,16 @@ class ChoferAppController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
+        // ?todas=1 → también las leídas (la bandeja de avisos de la app); por defecto solo las no leídas
         $notificaciones = $user->notificaciones()
-                               ->noLeidas()
+                               ->when(! $request->boolean('todas'), fn ($q) => $q->noLeidas())
                                ->orderByDesc('created_at')
                                ->limit(50)
-                               ->get(['id', 'titulo', 'mensaje', 'tipo', 'referencia_id', 'created_at']);
+                               ->get(['id', 'titulo', 'mensaje', 'tipo', 'referencia_id', 'leida', 'created_at']);
 
         return response()->json([
-            'notificaciones' => $notificaciones,
-            'total_no_leidas' => $notificaciones->count(),
+            'notificaciones'  => $notificaciones,
+            'total_no_leidas' => $user->notificaciones()->noLeidas()->count(),
         ]);
     }
 
