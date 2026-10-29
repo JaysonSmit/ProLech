@@ -154,9 +154,9 @@
     <div class="card borde" style="--c:var(--naranja);flex:1"><span class="tag oro">Ventas</span><h3 style="margin-top:8px">Producción y tienda</h3><p style="font-size:15px">Órdenes maestro–detalle, lotes con vencimiento y e-commerce.</p></div>
   </div>
   <div class="grid g3" style="margin-top:26px">
-    <div class="card"><div class="num">158</div><div class="sub">rutas (23 de API REST)</div></div>
+    <div class="card"><div class="num">160</div><div class="sub">rutas (23 de API REST)</div></div>
     <div class="card"><div class="num">67 + 4</div><div class="sub">migraciones del servidor + del celular (SQLDelight)</div></div>
-    <div class="card"><div class="num">325</div><div class="sub">verificaciones aprobadas (175 backend · 63 app · 87 E2E/aceptación)</div></div>
+    <div class="card"><div class="num">338</div><div class="sub">verificaciones aprobadas (183 backend · 68 app · 87 E2E/aceptación)</div></div>
   </div>
   <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
 </section>
@@ -275,6 +275,16 @@
   <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
 </section>
 
+<section class="slide">
+  <div class="kicker">6b · Arquitectura en capas</div>
+  <h2>Círculos concéntricos: las dependencias apuntan al centro</h2>
+  <div class="grid g2" style="gap:18px">
+    <figure><img class="shot" src="img/capas-backend.png" style="height:420px;object-fit:contain;background:#fff"><figcaption class="sub">Backend Laravel 13: rutas → controladores → servicios de dominio → modelos Eloquent</figcaption></figure>
+    <figure><img class="shot" src="img/capas-app.png" style="height:420px;object-fit:contain;background:#fff"><figcaption class="sub">App KMP: datos (SQLDelight, Ktor, OSMDroid) → presentación → casos de uso → dominio</figcaption></figure>
+  </div>
+  <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
+</section>
+
 <!-- 8. Sincronización -->
 <section class="slide">
   <div class="kicker">7 · Offline-first</div>
@@ -296,6 +306,16 @@
       </div>
       <p style="font-size:14px;margin-top:8px;text-align:center">Modo avión → «Pendiente» · al volver la red → «Sincronizado» (emulador Android 14)</p>
     </div>
+  </div>
+  <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
+</section>
+
+<section class="slide">
+  <div class="kicker">7b · Secuencia y base local</div>
+  <h2>Del modo avión al servidor, sin duplicados</h2>
+  <div class="grid" style="grid-template-columns:1.25fr 1fr;gap:18px">
+    <figure><img class="shot" src="img/secuencia-sync.png" style="height:440px;object-fit:contain;background:#fff"><figcaption class="sub">SyncManager → POST /api/acopios-campo: upsert por UUID y Last-Write-Wins</figcaption></figure>
+    <figure><img class="shot" src="img/sqldelight.png" style="height:440px;object-fit:contain;background:#fff"><figcaption class="sub">SQLDelight v4: 5 tablas; estadoSync, errorSync y actualizadoEn controlan la sincronización</figcaption></figure>
   </div>
   <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
 </section>
@@ -421,13 +441,36 @@
   <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
 </section>
 
+<section class="slide">
+  <div class="kicker">12b · Incremento: kárdex valorizado</div>
+  <h2>Leche cruda y productos al costo promedio ponderado</h2>
+  <div class="grid" style="grid-template-columns:1fr 1.45fr;gap:24px">
+    <div>
+      <div class="codigo" style="font-size:14px">Entrada: saldo += cant × costo
+Salida:  costo = saldo_valor ÷ saldo_cant
+Promedio = saldo_valor ÷ saldo_cant
+
+<span class="c">Leche Cruda</span>
+  entra: acopio del día (costo real/L)
+  sale:  lotes de producción
+
+<span class="c">Productos terminados</span>
+  entra: lotes (costo ÷ unidades)
+  sale:  ventas y tienda web</div>
+      <p style="font-size:15px;margin-top:12px">Paginación en español en todos los listados: «Mostrando 1 a 15 de N resultados».</p>
+    </div>
+    <img class="shot" src="img/kardex.png" style="height:480px">
+  </div>
+  <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
+</section>
+
 <!-- 14. Producción y e-commerce -->
 <section class="slide">
   <div class="kicker">13 · Incremento: producción y e-commerce</div>
   <h2>Orden maestro–detalle → lotes con vencimiento → tienda</h2>
   <div class="grid g3" style="gap:16px">
     <figure><img class="shot" src="img/produccion.png" style="height:330px"><figcaption class="sub">Orden de producción multiproducto (descuenta insumos, crea lotes ORD con vida útil)</figcaption></figure>
-    <figure><img class="shot" src="img/ventas.png" style="height:330px"><figcaption class="sub">Dashboard de ventas: KPIs, gráfico de 30 días y carruseles</figcaption></figure>
+    <figure><img class="shot" src="img/ventas-carrusel.png" style="height:330px"><figcaption class="sub">Más vendidos con el Manjar Blanco artesanal y productos por vencer</figcaption></figure>
     <figure><img class="shot" src="img/tienda.png" style="height:330px"><figcaption class="sub">Tienda en línea: Yape, tarjeta o efectivo, boleta B001 y seguimiento</figcaption></figure>
   </div>
   <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
@@ -448,6 +491,17 @@
   <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
 </section>
 
+<section class="slide">
+  <div class="kicker">15b · Gestión de la configuración</div>
+  <h2>GitHub: monorepo con ramas por sprint</h2>
+  <div class="grid g2" style="gap:18px">
+    <figure><img class="shot" src="img/github-ramas.png" style="height:360px"><figcaption class="sub">6 ramas: main, develop, 2 del Sprint 1 (incluida la corrección de 2 strikes) y 2 del Sprint 2</figcaption></figure>
+    <figure><img class="shot" src="img/github-commits.png" style="height:360px"><figcaption class="sub">Historial de develop: fusiones «Merge pull request» y commits feat/fix/refactor/docs</figcaption></figure>
+  </div>
+  <p style="font-size:15px;margin-top:10px" class="mono">github.com/JaysonSmit/ProLech · prolech-backend/ + aplicacionnnnnn/ · historial real importado con git subtree</p>
+  <div class="pie"><span><b>ProLech</b> · Sustentación</span><span class="n"></span></div>
+</section>
+
 <!-- 16. Métricas -->
 <section class="slide">
   <div class="kicker">15 · Métricas reales de los 2 sprints</div>
@@ -464,7 +518,7 @@
         <tr><td>Velocidad promedio</td><td class="der"><b>64 pts</b></td></tr>
         <tr><td>Cumplimiento (128/142)</td><td class="der"><b>90.1 %</b></td></tr>
         <tr><td>Avance del producto</td><td class="der"><b>92.1 %</b></td></tr>
-        <tr><td>Defectos / KLOC</td><td class="der">43 / 55.9 = 0.77</td></tr>
+        <tr><td>Defectos / KLOC</td><td class="der">46 / 56.6 = 0.81</td></tr>
       </table>
     </div>
   </div>
@@ -474,12 +528,12 @@
 <!-- 17. Pruebas -->
 <section class="slide">
   <div class="kicker">16 · Calidad del producto</div>
-  <h2>325 verificaciones, 0 fallidas</h2>
+  <h2>338 verificaciones, 0 fallidas</h2>
   <div class="grid g4" style="margin-bottom:18px">
-    <div class="card borde" style="--c:var(--azul)"><div class="num">175</div><div class="sub">pruebas PHPUnit · 775 aserciones</div></div>
-    <div class="card borde" style="--c:var(--verde)"><div class="num" style="--c:var(--verde)">63</div><div class="sub">pruebas kotlin.test (SQLDelight, Sync, ViewModel)</div></div>
+    <div class="card borde" style="--c:var(--azul)"><div class="num">183</div><div class="sub">pruebas PHPUnit · 841 aserciones</div></div>
+    <div class="card borde" style="--c:var(--verde)"><div class="num" style="--c:var(--verde)">68</div><div class="sub">pruebas kotlin.test · reporte Gradle 100 %</div></div>
     <div class="card borde" style="--c:var(--morado)"><div class="num" style="--c:var(--morado)">82</div><div class="sub">peticiones y pasos E2E contra el servidor real</div></div>
-    <div class="card borde" style="--c:var(--naranja)"><div class="num" style="--c:var(--naranja)">5</div><div class="sub">aceptación en emulador y Samsung S21 FE</div></div>
+    <div class="card borde" style="--c:var(--naranja)"><div class="num" style="--c:var(--naranja)">5</div><div class="sub">aceptación en emulador y Samsung Galaxy S25 Ultra</div></div>
   </div>
   <table>
     <tr><th>Caso</th><th>Escenario</th><th>Resultado</th></tr>

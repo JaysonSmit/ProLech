@@ -224,6 +224,7 @@ val viewModelModule = module {
             monitor            = get(),
             syncManager        = get(),
             accionesTicket     = get(),
+            lector             = getOrNull(),
             contexto           = run {
                 val config = get<com.example.prolechc.data.local.ConfigLocal>()
                 get<RutaDiaRepositorio>().observar().map { guardada ->

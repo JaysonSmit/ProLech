@@ -1,5 +1,6 @@
 package com.example.prolechc.presentation.acopios
 
+import androidx.compose.runtime.collectAsState
 import androidx.compose.material3.FilterChip
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.background
@@ -255,6 +256,8 @@ private fun FormularioAcopioCard(
 ) {
     val numerico = KeyboardOptions(keyboardType = KeyboardType.Decimal)
     val fotoEvidencia = rememberTomarFoto(viewModel::onFotoEvidencia)
+    val fotoLactoscan = rememberTomarFoto(viewModel::onFotoLactoscan)
+    val leyendo = viewModel.uiState.collectAsState().value.leyendoLactoscan
 
     Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(
@@ -325,6 +328,32 @@ private fun FormularioAcopioCard(
                     label = { Text(if (form.observacion == Observacion.OTRO) "¿Qué notaste?" else "Nota (opcional)") },
                     singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
+            }
+
+            // Solo si la unidad lleva Lactoscan portátil; si no, la calidad la mide la planta
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Switch(checked = form.conLactoscan, onCheckedChange = viewModel::onConLactoscan)
+                Text("  🔬 Tengo Lactoscan portátil", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (form.conLactoscan) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = form.porcentajeAgua, onValueChange = viewModel::onPorcentajeAgua,
+                        label = { Text("% Agua") }, keyboardOptions = numerico, singleLine = true, modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = form.densidad, onValueChange = viewModel::onDensidad,
+                        label = { Text("Densidad") }, keyboardOptions = numerico, singleLine = true, modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = form.grasa, onValueChange = viewModel::onGrasa,
+                        label = { Text("% Grasa") }, keyboardOptions = numerico, singleLine = true, modifier = Modifier.weight(1f)
+                    )
+                }
+                OutlinedButton(onClick = fotoLactoscan, enabled = !leyendo, modifier = Modifier.fillMaxWidth()) {
+                    if (leyendo) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    else Text("📷 Leer pantalla del Lactoscan (OCR, funciona sin señal)")
+                }
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -206,4 +206,21 @@ class AcopioViewModelTest {
         assertTrue(cerrada)
         assertEquals(1, e.auth.logouts)
     }
+
+    @Test
+    fun con_lactoscan_portatil_guarda_agua_y_densidad_y_evalua_calidad() = runTest {
+        val e = Escenario(this)
+        e.vm.onGanaderoSeleccionado(GanaderoCampo(7, "Juan Quispe", "1"))
+        e.vm.onLitros("40")
+        e.vm.onConLactoscan(true)
+        e.vm.onPorcentajeAgua("5")
+        e.vm.onDensidad("1,030")
+        e.vm.guardar()
+        advanceUntilIdle()
+
+        val acopio = e.vm.uiState.value.acopios.single()
+        assertEquals(5.0, acopio.porcentajeAgua)
+        assertEquals(1.030, acopio.densidad)
+        assertEquals(EstadoCalidad.RECHAZADO, acopio.estadoCalidad)   // regla de campo: más de 3 % de agua
+    }
 }
