@@ -33,23 +33,40 @@ class ProduccionLoteController extends Controller
     // ── POST /admin/produccion/lotes ──────────────────────────────────────────
     public function store(Request $request)
     {
+        // Forma antigua (un solo producto) → se convierte en una orden de una línea
+        if (! $request->has('lineas') && $request->filled('receta_id')) {
+            $request->merge(['lineas' => [[
+                'receta_id' => $request->input('receta_id'),
+                'cantidad'  => $request->input('cantidad_producida'),
+            ]]]);
+        }
+
         $validated = $request->validate([
-            'receta_id'          => ['required', 'integer', 'exists:recetas,id'],
-            'cantidad_producida'  => ['required', 'integer', 'min:1', 'max:99999'],
-            'observaciones'       => ['nullable', 'string', 'max:1000'],
+            'lineas'             => ['required', 'array', 'min:1', 'max:20'],
+            'lineas.*.receta_id' => ['required', 'integer', 'exists:recetas,id'],
+            'lineas.*.cantidad'  => ['required', 'integer', 'min:1', 'max:99999'],
+            'observaciones'      => ['nullable', 'string', 'max:1000'],
+        ], [
+            'lineas.required'           => 'Agrega al menos un producto a la orden.',
+            'lineas.*.cantidad.min'     => 'Cada producto necesita una cantidad mayor a 0.',
+            'lineas.*.receta_id.exists' => 'Uno de los productos no existe.',
         ]);
 
         try {
-            $lote = $this->produccionService->registrarLote(
-                recetaId:          (int)   $validated['receta_id'],
-                cantidadProducida: (int)   $validated['cantidad_producida'],
-                responsable:       $request->user(),
-                observaciones:     $validated['observaciones'] ?? null,
+            $lotes = $this->produccionService->registrarOrden(
+                lineas:        $validated['lineas'],
+                responsable:   $request->user(),
+                observaciones: $validated['observaciones'] ?? null,
             );
+
+            $resumen = $lotes->map(fn ($l) => "{$l->receta->nombre} × {$l->cantidad_producida}")->implode(', ');
+            $titulo = $lotes->count() > 1
+                ? "Orden {$lotes->first()->orden_codigo} registrada: {$lotes->count()} lotes"
+                : "Lote {$lotes->first()->codigo_lote} registrado";
 
             return redirect()
                 ->route('admin.produccion.lotes.create')
-                ->with('success', "✅ Lote {$lote->codigo_lote} registrado — {$lote->cantidad_producida} unidades · S/ " . number_format($lote->costo_total, 2));
+                ->with('success', "✅ {$titulo} — {$resumen} · S/ " . number_format($lotes->sum('costo_total'), 2));
 
         } catch (\RuntimeException $e) {
             // Stock insuficiente u otra regla de negocio → error visible al usuario

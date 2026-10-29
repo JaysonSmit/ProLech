@@ -31,6 +31,13 @@ class AcopioCampo extends Model
         'actualizado_en'  => 'integer',
     ];
 
+    /** Cada registro de campo mantiene su acopio espejo en la tabla acopios. */
+    protected static function booted(): void
+    {
+        static::saved(fn (self $campo) => app(\App\Services\AcopioCampoEnlace::class)->sincronizar($campo));
+        static::deleting(fn (self $campo) => app(\App\Services\AcopioCampoEnlace::class)->eliminar($campo));
+    }
+
     // ── Relaciones ─────────────────────────────────────────────────────────────
 
     public function chofer()

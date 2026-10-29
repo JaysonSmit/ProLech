@@ -167,5 +167,8 @@ class DatabaseSeeder extends Seeder
 
         // ── Módulo de Producción por Receta ───────────────────────────────────
         $this->call(ProduccionSeeder::class);
+
+        // ── Operación completa de Huata: zonas, rutas del mes, historial, tienda ──
+        $this->call(ProlechDemoSeeder::class);
     }
 }

@@ -22,6 +22,9 @@ class Venta extends Model
         'notas_despacho',
         'fecha_venta',
         'registrado_por',
+        'anulada_at',
+        'anulada_por',
+        'motivo_anulacion',
     ];
 
     protected $casts = [
@@ -30,7 +33,11 @@ class Venta extends Model
         'cantidad_kg'     => 'float',
         'precio_unitario' => 'float',
         'total'           => 'float',
+        'anulada_at'      => 'datetime',
     ];
+
+    /** La venta con carrito ya trae su total (suma de las líneas); no se recalcula con kg × precio. */
+    public bool $totalDesdeDetalles = false;
 
     // Precios de referencia del negocio (como fallback si no hay configuración)
     const PRECIO_MAYORISTA = 20.00;
@@ -55,11 +62,40 @@ class Venta extends Model
         parent::boot();
 
         static::saving(function (self $model) {
-            $model->total = $model->cantidad_kg * $model->precio_unitario;
+            if (! $model->totalDesdeDetalles) {
+                $model->total = $model->cantidad_kg * $model->precio_unitario;
+            }
             if (empty($model->destino)) {
                 $model->destino = 'Planta / Local';
             }
         });
+    }
+
+    /** Ventas que cuentan para totales, reportes y stock (las anuladas no). */
+    public function scopeVigentes($query)
+    {
+        return $query->whereNull('anulada_at');
+    }
+
+    public function getAnuladaAttribute(): bool
+    {
+        return $this->anulada_at !== null;
+    }
+
+    /** Número que se imprime en el comprobante: V-000123. */
+    public function getNumeroComprobanteAttribute(): string
+    {
+        return 'V-' . str_pad((string) $this->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    public function anulador()
+    {
+        return $this->belongsTo(User::class, 'anulada_por');
+    }
+
+    public function detalles()
+    {
+        return $this->hasMany(VentaDetalle::class);
     }
 
     public function registrador()

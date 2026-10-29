@@ -85,7 +85,7 @@ class ReportesController extends Controller
         ]);
 
         // ── Ventas mensuales ───────────────────────────────────────────────────
-        $ventasMensual = Venta::selectRaw(
+        $ventasMensual = Venta::vigentes()->selectRaw(
                 $this->mes('fecha_venta') . ' as mes,
                  tipo_cliente,
                  SUM(total) as total_ventas,
@@ -103,7 +103,7 @@ class ReportesController extends Controller
             'total_acopios'    => Acopio::whereYear('fecha', $anio)->where('estado', 'aprobado')->count(),
             'adulterados'      => Acopio::whereYear('fecha', $anio)->where('estado', 'rechazado')->count(),
             'total_kg_queso'   => Produccion::whereYear('fecha_lote', $anio)->sum('kg_queso_estimado'),
-            'total_ventas'     => Venta::whereYear('fecha_venta', $anio)->sum('total'),
+            'total_ventas'     => Venta::vigentes()->whereYear('fecha_venta', $anio)->sum('total'),
             'costo_produccion' => Produccion::whereYear('fecha_lote', $anio)->sum('costo_total'),
         ];
         $resumenAnio['margen'] = $resumenAnio['total_ventas'] - $resumenAnio['costo_produccion'];
@@ -202,7 +202,7 @@ class ReportesController extends Controller
         ];
 
         // Rentabilidad por destino en el año
-        $rentabilidadDestinos = Venta::whereYear('fecha_venta', $anio)
+        $rentabilidadDestinos = Venta::vigentes()->whereYear('fecha_venta', $anio)
             ->selectRaw('destino, SUM(cantidad_kg) as total_kg, SUM(total) as total_ingreso, COUNT(*) as num_despachos')
             ->groupBy('destino')
             ->orderByDesc('total_ingreso')
