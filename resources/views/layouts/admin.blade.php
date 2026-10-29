@@ -699,6 +699,11 @@
             <span class="nav-icon">⊞</span>
             <span>Dashboard</span>
         </a>
+        <a href="{{ route('admin.acopios') }}"
+           class="nav-link {{ request()->routeIs('admin.acopios') ? 'active' : '' }}">
+            <span class="nav-icon">🥛</span>
+            <span>Entregas de leche</span>
+        </a>
         @endif
 
         @if($webUser->seccionWebPermitida('produccion') || $webUser->seccionWebPermitida('ventas') || $webUser->seccionWebPermitida('liquidaciones'))
@@ -716,6 +721,12 @@
            style="padding-left:28px;font-size:.82rem">
             <span class="nav-icon" style="font-size:.85rem">📋</span>
             <span>Recetas</span>
+        </a>
+        <a href="{{ route('admin.kardex.insumos') }}"
+           class="nav-link {{ request()->routeIs('admin.kardex*') ? 'active' : '' }}"
+           style="padding-left:28px;font-size:.82rem">
+            <span class="nav-icon" style="font-size:.85rem">📒</span>
+            <span>Kárdex valorizado</span>
         </a>
         <a href="{{ route('admin.inventario.index') }}"
            class="nav-link {{ request()->routeIs('admin.inventario*') ? 'active' : '' }}"
@@ -964,7 +975,7 @@
     <div class="topbar">
         <div class="topbar-title">
             <h2>@yield('page-title', 'Panel Administrador')</h2>
-            <p>{{ now()->isoFormat('dddd, D [de] MMMM YYYY') }}</p>
+            <p>{{ now()->locale('es')->isoFormat('dddd, D [de] MMMM [de] YYYY') }}</p>
         </div>
         <div class="topbar-actions">
             <div class="topbar-pill">

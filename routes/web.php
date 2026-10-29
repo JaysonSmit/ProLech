@@ -104,7 +104,7 @@ Route::middleware(['auth', 'rol:admin,calidad,asistente,jefe_produccion,despacho
 
     Route::middleware('seccion:dashboard')->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
-        Route::get('acopios', fn () => redirect()->route('admin.dashboard'))->name('acopios');
+        Route::get('acopios', [\App\Http\Controllers\Web\AcopioWebController::class, 'index'])->name('acopios');
     });
 
     Route::middleware('seccion:produccion')->group(function () {
@@ -134,6 +134,8 @@ Route::middleware(['auth', 'rol:admin,calidad,asistente,jefe_produccion,despacho
         Route::get('inventario',                              [InsumoController::class, 'index'])->name('inventario.index');
         Route::post('inventario/ingreso',                     [InsumoController::class, 'ingreso'])->name('inventario.ingreso');
         Route::get('inventario/{insumo}/movimientos',         [InsumoController::class, 'movimientos'])->name('inventario.movimientos');
+        Route::get('kardex/insumos',   [\App\Http\Controllers\Web\KardexController::class, 'insumos'])->name('kardex.insumos');
+        Route::get('kardex/productos', [\App\Http\Controllers\Web\KardexController::class, 'productos'])->name('kardex.productos');
     });    Route::middleware('seccion:ventas')->group(function () {
         Route::get('ventas',  [AdminDashboardController::class, 'ventas'])->name('ventas');
         Route::post('ventas', [AdminDashboardController::class, 'ventasStore'])->name('ventas.store');
