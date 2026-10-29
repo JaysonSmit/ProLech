@@ -676,6 +676,7 @@
     </style>
 </head>
 <body>
+@include('partials.pantalla-carga')
 
 {{-- ── Sidebar ──────────────────────────────────────────────────────────── --}}
 <aside class="sidebar">

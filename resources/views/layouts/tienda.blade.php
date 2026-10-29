@@ -363,6 +363,7 @@
     @stack('styles')
 </head>
 <body>
+@include('partials.pantalla-carga')
 
 <div class="topbar">
     🥛 Leche fresca de ganaderos de <strong>Huata, Puno</strong> · paga con Yape, tarjeta o contra entrega
