@@ -1,0 +1,23 @@
+# Monorepo ProLech: backend Laravel + app Kotlin Multiplatform
+# Dependencias y compilados
+vendor/
+node_modules/
+.gradle/
+.kotlin/
+**/build/
+*.apk
+*.aab
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+local.properties
+keystore.properties
+*.jks
+*.keystore
+# IDE y sistema
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

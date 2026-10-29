@@ -1,0 +1,50 @@
+# Corre la suite de PHPUnit en cada push y pull request.
+name: Backend - pruebas
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_sqlite, sqlite3, gd, zip, intl
+          coverage: none
+
+      - name: Dependencias PHP (con caché)
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+      - run: composer install --no-interaction --prefer-dist --no-progress
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compilar assets (Vite)
+        run: npm install --no-audit --no-fund && npm run build
+
+      - name: Preparar entorno
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: PHPUnit
+        run: php artisan test
+
+  docker:
+    # Verifica que la imagen de producción (deploy/Dockerfile) compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Imagen app (PHP-FPM)
+        run: docker build -f deploy/Dockerfile --target app -t prolech-app .
+      - name: Imagen web (Caddy)
+        run: docker build -f deploy/Dockerfile --target web -t prolech-web .
