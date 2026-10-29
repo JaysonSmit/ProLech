@@ -15,6 +15,25 @@ class GanaderoController extends Controller
     // GET /admin/ganaderos
     // ──────────────────────────────────────────────────────────────────────────
 
+    /** Ficha de seguimiento del ganadero: semáforo, entregas, pagos y controles de calidad. */
+    public function show(Ganadero $ganadero): View
+    {
+        $ganadero->load('zona:id,nombre');
+        $riesgo = app(\App\Services\ControlCalidadService::class)->riesgo($ganadero);
+        $acopios = \App\Models\Acopio::with('chofer:id,name')->where('ganadero_id', $ganadero->id)
+            ->orderByDesc('fecha')->orderByDesc('id')->paginate(10);
+        $resumen = \App\Models\Acopio::where('ganadero_id', $ganadero->id)->whereDate('fecha', '>=', today()->subDays(30))
+            ->selectRaw("COUNT(*) n, COALESCE(SUM(litros),0) litros, AVG(porcentaje_agua) agua,
+                SUM(CASE WHEN estado IN ('observado','rechazado') THEN 1 ELSE 0 END) malas")->first();
+        $liquidaciones = \App\Models\Liquidacion::where('ganadero_id', $ganadero->id)->latest('semana_inicio')->take(6)->get();
+        $controles = \App\Models\ControlCalidad::where('ganadero_id', $ganadero->id)->latest('fecha')->take(6)->get();
+        // Litros por día de los últimos 30 días para el gráfico
+        $serie = \App\Models\Acopio::where('ganadero_id', $ganadero->id)->whereDate('fecha', '>=', today()->subDays(29))
+            ->selectRaw('DATE(fecha) dia, SUM(litros) litros')->groupByRaw('DATE(fecha)')->pluck('litros', 'dia');
+
+        return view('admin.ganaderos.show', compact('ganadero', 'riesgo', 'acopios', 'resumen', 'liquidaciones', 'controles', 'serie'));
+    }
+
     public function index(Request $request): View
     {
         $query  = $request->input('q');

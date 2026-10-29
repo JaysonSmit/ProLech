@@ -85,7 +85,7 @@
                         @foreach($ganaderos as $g)
                         <tr id="fila-{{ $g->id }}">
                             <td>
-                                <strong>{{ $g->nombre }}</strong>
+                                <a href="{{ route('admin.ganaderos.show', $g) }}" style="color:inherit"><strong>{{ $g->nombre }}</strong></a>
                             </td>
                             <td class="mono">{{ $g->dni }}</td>
                             <td>
