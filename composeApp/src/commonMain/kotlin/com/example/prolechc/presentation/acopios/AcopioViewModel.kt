@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.prolechc.data.archivos.borrarArchivo
 import com.example.prolechc.data.dispositivo.AccionesTicket
+import com.example.prolechc.data.dispositivo.LectorLactoscan
 import com.example.prolechc.data.network.MonitorConectividad
 import com.example.prolechc.data.sync.SyncManager
 import com.example.prolechc.domain.Tiempo
@@ -43,6 +44,11 @@ data class FormularioAcopio(
     val muestraCodigo: String? = null,
     /** Foto de evidencia tomada para este acopio (ruta local). */
     val fotoLocal: String?     = null,
+    /** Unidad con Lactoscan portátil: el chofer puede anotar (o leer por OCR) agua, densidad y grasa. */
+    val conLactoscan: Boolean  = false,
+    val porcentajeAgua: String = "",
+    val densidad: String       = "",
+    val grasa: String          = "",
     /** Acopio que se está editando; null = registro nuevo. */
     val editando: Acopio?      = null
 )
@@ -63,7 +69,8 @@ data class AcopioUiState(
     val sincronizando: Boolean         = false,
     val mensaje: String?               = null,
     val contexto: ContextoRuta         = ContextoRuta(),
-    val inicioHoy: Long                = 0
+    val inicioHoy: Long                = 0,
+    val leyendoLactoscan: Boolean      = false
 ) {
     val pendientes: Int get() = acopios.count { it.estadoSync != EstadoSync.SINCRONIZADO }
     val conError: Int get() = acopios.count { it.errorSync != null }
@@ -87,24 +94,27 @@ class AcopioViewModel(
     syncManager: SyncManager,
     private val reloj: () -> Long = { Tiempo.ahoraMs() },
     private val accionesTicket: AccionesTicket? = null,
+    private val lector: LectorLactoscan? = null,
     contexto: kotlinx.coroutines.flow.Flow<ContextoRuta> = flowOf(ContextoRuta())
 ) : ViewModel() {
 
     private val mensaje = MutableStateFlow<String?>(null)
     private val formulario = MutableStateFlow(FormularioAcopio())
+    private val leyendo = MutableStateFlow(false)
     private var nivelAvisado = NivelCarga.NORMAL
 
     /** La UI solo lee de SQLDelight (Single Source of Truth). */
     val uiState: StateFlow<AcopioUiState> = combine(
         observarAcopios(),
         observarGanaderos(),
-        combine(monitor.enLinea, syncManager.sincronizando, ::Pair),
+        combine(monitor.enLinea, syncManager.sincronizando, leyendo, ::Triple),
         contexto,
         combine(formulario, mensaje) { form, msg -> form to msg }
-    ) { acopios, ganaderos, (enLinea, sincronizando), ctx, (form, msg) ->
+    ) { acopios, ganaderos, (enLinea, sincronizando, leyendoOcr), ctx, (form, msg) ->
         AcopioUiState(
             acopios, ganaderos, form, enLinea, sincronizando, msg, ctx,
-            inicioHoy = Tiempo.inicioDelDiaMs(reloj())
+            inicioHoy = Tiempo.inicioDelDiaMs(reloj()),
+            leyendoLactoscan = leyendoOcr
         )
     }.stateIn(
         scope        = viewModelScope,
@@ -143,6 +153,41 @@ class AcopioViewModel(
 
     fun quitarFoto() = formulario.update { it.copy(fotoLocal = null) }
 
+    // ── Lactoscan portátil (opcional) ─────────────────────────────────────────
+
+    fun onConLactoscan(valor: Boolean) = formulario.update { it.copy(conLactoscan = valor) }
+    fun onPorcentajeAgua(valor: String) = formulario.update { it.copy(porcentajeAgua = valor) }
+    fun onDensidad(valor: String) = formulario.update { it.copy(densidad = valor) }
+    fun onGrasa(valor: String) = formulario.update { it.copy(grasa = valor) }
+
+    /** Foto de la pantalla del Lactoscan → OCR en el celular (sin señal) → agua, densidad y grasa. */
+    fun onFotoLactoscan(ruta: String?) {
+        if (ruta == null) return
+        val ocr = lector ?: run { onFotoEvidencia(ruta); return }
+        viewModelScope.launch {
+            leyendo.value = true
+            ocr.leer(ruta)
+                .onSuccess { r ->
+                    if (r.vacio) {
+                        mensaje.value = "No se reconocieron valores. Acerca la cámara y evita reflejos."
+                    } else {
+                        formulario.update {
+                            it.copy(
+                                conLactoscan   = true,
+                                porcentajeAgua = r.aguaAniadida?.let { v -> formato(v, 1) } ?: it.porcentajeAgua,
+                                densidad       = r.densidad?.let { v -> formato(v, 3) } ?: it.densidad,
+                                grasa          = r.grasa?.let { v -> formato(v, 1) } ?: it.grasa,
+                                fotoLocal      = ruta
+                            )
+                        }
+                        mensaje.value = "🔎 Lactoscan leído: revisa los valores antes de guardar"
+                    }
+                }
+                .onFailure { mensaje.value = "No se pudo leer el Lactoscan: ${it.message}" }
+            leyendo.value = false
+        }
+    }
+
     fun editar(acopio: Acopio) {
         formulario.value = FormularioAcopio(
             ganaderoId     = acopio.ganaderoId.toString(),
@@ -152,6 +197,10 @@ class AcopioViewModel(
             observacionNota = acopio.observacionNota.orEmpty(),
             muestraCodigo  = acopio.muestraCodigo,
             fotoLocal      = acopio.fotoLocal,
+            conLactoscan   = acopio.porcentajeAgua > 0 || acopio.densidad > 0,
+            porcentajeAgua = if (acopio.porcentajeAgua > 0) acopio.porcentajeAgua.toString() else "",
+            densidad       = if (acopio.densidad > 0) acopio.densidad.toString() else "",
+            grasa          = acopio.grasa?.toString().orEmpty(),
             editando       = acopio
         )
         acopio.errorSync?.let { mensaje.value = "Corrige el dato: $it" }
@@ -178,6 +227,14 @@ class AcopioViewModel(
         }
         val observacion = form.observacion.clave
         val nota = form.observacionNota.trim().takeIf { it.isNotEmpty() }
+        // Lactoscan portátil: opcional; vacío = 0 («sin medir», lo mide la planta)
+        val agua = if (form.conLactoscan && form.porcentajeAgua.isNotBlank()) form.porcentajeAgua.aNumero() else 0.0
+        val dens = if (form.conLactoscan && form.densidad.isNotBlank()) form.densidad.aNumero() else 0.0
+        val grasa = if (form.conLactoscan && form.grasa.isNotBlank()) form.grasa.aNumero() else null
+        if (agua == null || dens == null || (form.conLactoscan && form.grasa.isNotBlank() && grasa == null)) {
+            mensaje.value = "Los valores del Lactoscan deben ser números (ej. 0,5 · 1,030 · 3,5)"
+            return
+        }
         // Regla del negocio (igual que POST /api/acopios): una entrega por ganadero al día
         if (form.editando == null) {
             val inicioHoy = Tiempo.inicioDelDiaMs(reloj())
@@ -191,7 +248,7 @@ class AcopioViewModel(
             val editando = form.editando
             val resultado = if (editando == null) {
                 registrarAcopio(
-                    id, form.ganaderoNombre, lts, fotoLocal = form.fotoLocal,
+                    id, form.ganaderoNombre, lts, agua, dens, grasa, fotoLocal = form.fotoLocal,
                     observacion = observacion, observacionNota = nota, muestraCodigo = form.muestraCodigo
                 )
             } else {
@@ -202,6 +259,9 @@ class AcopioViewModel(
                         ganaderoId     = id,
                         ganaderoNombre = form.ganaderoNombre.trim(),
                         litros         = lts,
+                        porcentajeAgua = agua,
+                        densidad       = dens,
+                        grasa          = grasa,
                         observacion    = observacion,
                         observacionNota = nota,
                         fotoLocal      = form.fotoLocal
