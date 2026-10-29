@@ -130,7 +130,8 @@ class ControlCalidadService
             return collect();
         }
 
-        $zonasConChofer = AsignacionZona::where('mes', $fecha->month)->where('anio', $fecha->year)->whereNotNull('zona_id')->pluck('zona_id');
+        $zonasConChofer = AsignacionZona::where('mes', $fecha->month)->where('anio', $fecha->year)->get(['zona_id', 'zona_extra_id'])
+            ->flatMap(fn ($a) => [$a->zona_id, $a->zona_extra_id])->filter()->unique()->values();
         $candidatos = Ganadero::where('activo', true)->where('estado', '!=', Ganadero::ESTADO_SUSPENDIDO)
             ->where('entregas_bloqueadas', 0)->whereIn('zona_id', $zonasConChofer)->get()
             ->map(function (Ganadero $g) {
@@ -315,7 +316,7 @@ class ControlCalidadService
     {
         $ids = User::conRol('admin', 'calidad')->where('activo', true)->pluck('id');
         $chofer = $control->ganadero?->zona_id
-            ? AsignacionZona::where('zona_id', $control->ganadero->zona_id)->where('mes', now()->month)->where('anio', now()->year)->value('chofer_id')
+            ? AsignacionZona::choferDeZona($control->ganadero->zona_id)
             : null;
         if ($chofer) $ids->push($chofer);
         if ($control->ganadero?->user_id) $ids->push($control->ganadero->user_id);   // portal del proveedor

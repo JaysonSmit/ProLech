@@ -97,8 +97,8 @@ class PlanillaChoferService
 
         return [
             'chofer_id'           => $chofer->id,
-            'ruta'                => AsignacionZona::with('zona:id,nombre')->where('chofer_id', $chofer->id)
-                                        ->where('mes', $desde->month)->where('anio', $desde->year)->first()?->zona?->nombre ?? 'Volante',
+            'ruta'                => AsignacionZona::with('zona:id,nombre', 'zonaExtra:id,nombre')->where('chofer_id', $chofer->id)
+                                        ->where('mes', $desde->month)->where('anio', $desde->year)->first()?->nombreRutas() ?? 'Volante',
             'dias_trabajados'     => count($dias),
             'litros_recolectados' => $litros,
             'km_recorridos'       => $km,

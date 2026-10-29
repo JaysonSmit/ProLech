@@ -28,7 +28,7 @@ class RutaChoferService
     {
         $hoy = now();
 
-        $asignacion = AsignacionZona::with('zona')
+        $asignacion = AsignacionZona::with('zona', 'zonaExtra')
             ->where('chofer_id', $chofer->id)
             ->where('mes', $hoy->month)
             ->where('anio', $hoy->year)
@@ -38,15 +38,17 @@ class RutaChoferService
         $zona   = null;
         $nombre = null;
         $origen = null;
+        // Rutas que recorre hoy: la principal y, si hay más rutas que choferes, una segunda
+        $zonas  = collect([$asignacion?->zona, $asignacion?->zonaExtra])->filter()->values();
 
         if ($rutaManual) {
             $query->where('ruta_asignada', $rutaManual);
             $nombre = $rutaManual;
             $origen = 'manual';
-        } elseif ($asignacion?->zona) {
-            $zona   = $asignacion->zona;
-            $query->where('zona_id', $zona->id);
-            $nombre = $zona->nombre;
+        } elseif ($zonas->isNotEmpty()) {
+            $zona   = $zonas->first();
+            $query->whereIn('zona_id', $zonas->pluck('id'));
+            $nombre = $zonas->pluck('nombre')->join(' + ');
             $origen = 'zona';
         } else {
             // Sin zona este mes: ruta del último acopio, o la primera ruta con ganaderos activos
@@ -68,9 +70,18 @@ class RutaChoferService
         $muestras  = \App\Models\ControlCalidad::where('tipo', 'muestra')->where('estado', 'programado')
             ->whereDate('fecha', $hoy)->whereIn('ganadero_id', $ganaderos->pluck('id'))->pluck('frasco_codigo', 'ganadero_id');
         $planta    = $this->planta();
-        $ordenados = $zona?->tieneTrazado()
-            ? self::ordenarPorTrazado($ganaderos, $zona)
-            : $this->ordenarPorCercania($ganaderos, $planta);
+        if ($zonas->count() > 1 && ! $rutaManual) {
+            // Primero toda la ruta principal y luego la segunda, cada una en el orden de su camino
+            $ordenados = $zonas->flatMap(function ($z) use ($ganaderos, $planta) {
+                $deZona = $ganaderos->where('zona_id', $z->id)->values();
+                return $z->tieneTrazado() ? self::ordenarPorTrazado($deZona, $z) : $this->ordenarPorCercania($deZona, $planta);
+            });
+        } else {
+            $ordenados = $zona?->tieneTrazado()
+                ? self::ordenarPorTrazado($ganaderos, $zona)
+                : $this->ordenarPorCercania($ganaderos, $planta);
+        }
+        $nombreZona = $zonas->pluck('nombre', 'id');
 
         $paradas = $ordenados->values()->map(fn (Ganadero $g, int $i) => [
             'id'              => $g->id,
@@ -88,7 +99,12 @@ class RutaChoferService
             'bloqueo_motivo'  => $g->bloqueo_motivo,
             // Control sorpresa: el chofer se entera recién al registrar la entrega
             'muestra'         => $muestras[$g->id] ?? null,
+            // Ruta a la que pertenece la parada (útil cuando recorre dos)
+            'ruta'            => $nombreZona[$g->zona_id] ?? $nombre,
         ]);
+
+        $carga = $asignacion && $zonas->count() > 1 ? $asignacion->cargaEstimada() : null;
+        $trazados = $zonas->filter(fn ($z) => $z->tieneTrazado());
 
         return [
             'asignacion_id' => $asignacion?->id ?? 0,
@@ -105,8 +121,16 @@ class RutaChoferService
             'atendidos'     => $paradas->where('atendido', true)->count(),
             'paradas'       => $paradas->all(),
             // Camino trazado por el administrador ([[lat, lon], ...]); vacío = la app calcula uno
-            'trazado'       => $zona?->tieneTrazado() ? $zona->trazado : [],
-            'trazado_km'    => $zona?->tieneTrazado() ? (float) $zona->trazado_km : null,
+            'trazado'       => $trazados->flatMap(fn ($z) => $z->trazado)->values()->all(),
+            'trazado_km'    => $trazados->isNotEmpty() ? round((float) $trazados->sum('trazado_km'), 2) : null,
+            'rutas'         => $zonas->map(fn ($z) => [
+                'id' => $z->id, 'codigo' => $z->codigo, 'nombre' => $z->nombre,
+                'paradas' => $paradas->where('ruta', $z->nombre)->count(),
+            ])->all(),
+            // Dos rutas que juntas superan la capacidad del camión: el chofer debe volver a la planta a descargar
+            'aviso_capacidad' => $carga && $carga['excede']
+                ? "Tus 2 rutas suelen dar ~" . number_format($carga['litros'], 0) . " L y el camión carga " . number_format($carga['capacidad'], 0) . " L: descarga en la planta antes de la segunda ruta."
+                : null,
             // Formato anterior: se mantiene para versiones antiguas de la app
             'ganaderos'     => $ganaderos,
         ];

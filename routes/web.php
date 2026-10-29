@@ -235,6 +235,8 @@ Route::middleware(['auth', 'rol:admin', '2fa'])->prefix('admin')->name('admin.')
     Route::get('rotacion',                     [RotacionController::class, 'index'])->name('rotacion.index');
     Route::post('rotacion/generar-automatico', [RotacionController::class, 'generarAutomatico'])->name('rotacion.generar');
     Route::post('rotacion/asignar-manual',     [RotacionController::class, 'asignarManual'])->name('rotacion.asignar');
+    Route::post('rotacion/segunda-ruta',       [RotacionController::class, 'segundaRuta'])->name('rotacion.segunda');
+    Route::post('rotacion/cubrir-libres',      [RotacionController::class, 'cubrirLibres'])->name('rotacion.cubrir');
     Route::delete('rotacion/{asignacion}',     [RotacionController::class, 'destruir'])->name('rotacion.destruir');
 
     Route::post('ganaderos',                         [GanaderoController::class, 'store'])->name('ganaderos.store');

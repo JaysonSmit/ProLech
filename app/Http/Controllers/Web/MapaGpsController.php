@@ -57,8 +57,7 @@ class MapaGpsController extends Controller
                     'color'   => $z->color ?: '#1f6feb',
                     'km'      => $z->trazado_km,
                     'trazado' => $z->trazado,
-                    'chofer'  => \App\Models\AsignacionZona::with('chofer:id,name')->where('zona_id', $z->id)
-                        ->where('mes', now()->month)->where('anio', now()->year)->first()?->chofer?->name,
+                    'chofer'  => \App\Models\User::find(\App\Models\AsignacionZona::choferDeZona($z->id))?->name,
                 ])->values(),
         ]);
     }
@@ -98,10 +97,7 @@ class MapaGpsController extends Controller
             'minutos_desde'        => (int) $t->ultima_actualizacion->diffInMinutes(now()),
             // Trazo real recorrido hoy (puntos que envía la app)
             'recorrido'            => \App\Models\TrackingGpsPunto::recorridoDeHoy($t->chofer_id),
-            'zona'                 => \App\Models\AsignacionZona::with('zona:id,nombre')
-                                        ->where('chofer_id', $t->chofer_id)
-                                        ->where('mes', now()->month)->where('anio', now()->year)
-                                        ->first()?->zona?->nombre,
+            'zona'                 => \App\Models\AsignacionZona::rutaDelMes($t->chofer_id),
         ];
     }
 }

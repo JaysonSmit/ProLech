@@ -15,6 +15,7 @@ class AsignacionZona extends Model
     protected $fillable = [
         'chofer_id',
         'zona_id',
+        'zona_extra_id',
         'mes',
         'anio',
         'rol_mes',
@@ -38,12 +39,127 @@ class AsignacionZona extends Model
         return $this->belongsTo(Zona::class);
     }
 
+    /** Segunda ruta que el chofer cubre este mes (hay más rutas que choferes). */
+    public function zonaExtra()
+    {
+        return $this->belongsTo(Zona::class, 'zona_extra_id');
+    }
+
+    /** Asignaciones que recorren la zona, como ruta principal o como segunda ruta. */
+    public function scopeCubreZona($query, int $zonaId)
+    {
+        return $query->where(fn ($q) => $q->where('zona_id', $zonaId)->orWhere('zona_extra_id', $zonaId));
+    }
+
+    /** Ids de las zonas que recorre (1 o 2). */
+    public function zonaIds(): array
+    {
+        return array_values(array_filter([$this->zona_id, $this->zona_extra_id]));
+    }
+
+    /** «Collana 1», «Collana 1 + HUATA1», «Volante + PUNO» o «Volante». */
+    public function nombreRutas(): string
+    {
+        $principal = $this->zona?->nombre ?? 'Volante';
+        return $this->zonaExtra ? "{$principal} + {$this->zonaExtra->nombre}" : $principal;
+    }
+
+    /** Chofer que recorre la zona en el mes (titular o con ella como segunda ruta). */
+    public static function choferDeZona(int $zonaId, ?int $mes = null, ?int $anio = null): ?int
+    {
+        return self::cubreZona($zonaId)->where('mes', $mes ?? now()->month)->where('anio', $anio ?? now()->year)
+            ->orderByRaw('CASE WHEN zona_id = ? THEN 0 ELSE 1 END', [$zonaId])->value('chofer_id');
+    }
+
     /** Nombre de la ruta del chofer en el mes actual: la zona, «Volante» o null si no tiene asignación. */
     public static function rutaDelMes(int $choferId): ?string
     {
-        $a = self::with('zona:id,nombre')->where('chofer_id', $choferId)
+        $a = self::with('zona:id,nombre', 'zonaExtra:id,nombre')->where('chofer_id', $choferId)
             ->where('mes', now()->month)->where('anio', now()->year)->first();
-        return $a ? ($a->zona?->nombre ?? 'Volante') : null;
+        return $a?->nombreRutas();
+    }
+
+    // ── Segunda ruta y rutas libres ───────────────────────────────────────────
+
+    /** Litros por día que suele dar una ruta (promedio de los últimos 14 días con acopio). */
+    public static function litrosDiariosZona(int $zonaId): float
+    {
+        $porDia = Acopio::whereHas('ganadero', fn ($q) => $q->where('zona_id', $zonaId))
+            ->whereDate('fecha', '>=', today()->subDays(14))->where('estado', '!=', 'rechazado')
+            ->get(['fecha', 'litros'])->groupBy(fn ($a) => Carbon::parse($a->fecha)->toDateString())
+            ->map(fn ($dia) => (float) $dia->sum('litros'));
+        return round((float) $porDia->avg(), 1);
+    }
+
+    /** Carga diaria estimada del chofer (sus 1 o 2 rutas) frente a la capacidad del camión. */
+    public function cargaEstimada(): array
+    {
+        $litros = array_sum(array_map(fn ($id) => self::litrosDiariosZona($id), $this->zonaIds()));
+        $capacidad = (float) Configuracion::get('capacidad_camion_litros', 1200);
+        return [
+            'litros'    => round($litros, 1),
+            'capacidad' => $capacidad,
+            'excede'    => $capacidad > 0 && $litros > $capacidad,
+        ];
+    }
+
+    /** Zonas activas que nadie recorre en el mes. */
+    public static function zonasSinChofer(int $mes, int $anio)
+    {
+        $cubiertas = self::where('mes', $mes)->where('anio', $anio)->get(['zona_id', 'zona_extra_id'])
+            ->flatMap(fn ($a) => [$a->zona_id, $a->zona_extra_id])->filter()->unique();
+        return Zona::where('activa', true)->whereNotIn('id', $cubiertas)->orderBy('orden')->get();
+    }
+
+    /**
+     * Da una segunda ruta al chofer (o se la quita con $zonaId = null).
+     * La ruta no puede tener titular; si otro chofer la tenía como segunda ruta, pasa a este.
+     */
+    public static function asignarSegundaRuta(int $choferId, ?int $zonaId, int $mes, int $anio): string
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($choferId, $zonaId, $mes, $anio) {
+            $asig = self::where('chofer_id', $choferId)->where('mes', $mes)->where('anio', $anio)->lockForUpdate()->first();
+            if (! $asig) {
+                throw new \InvalidArgumentException('Primero asigna a este chofer una ruta o el rol de volante en el mes.');
+            }
+            if ($zonaId === null) {
+                $asig->update(['zona_extra_id' => null]);
+                return 'Se quitó la segunda ruta.';
+            }
+            if ($asig->zona_id === $zonaId) {
+                throw new \InvalidArgumentException('Esa ya es su ruta principal.');
+            }
+            $titular = self::with('chofer:id,name')->where('zona_id', $zonaId)->where('mes', $mes)->where('anio', $anio)->first();
+            if ($titular) {
+                throw new \InvalidArgumentException("Esa ruta ya la recorre {$titular->chofer?->name} como titular.");
+            }
+            $previo = self::with('chofer:id,name')->where('zona_extra_id', $zonaId)->where('mes', $mes)->where('anio', $anio)
+                ->where('chofer_id', '!=', $choferId)->first();
+            $previo?->update(['zona_extra_id' => null]);
+            $asig->update(['zona_extra_id' => $zonaId]);
+            return $previo ? "Antes la cubría {$previo->chofer?->name}." : '';
+        });
+    }
+
+    /**
+     * Reparte las rutas sin chofer como segunda ruta: primero al volante y después a los
+     * titulares cuya ruta da menos litros (para no pasarse de la capacidad del camión).
+     *
+     * @return array<int, string> descripción de cada asignación hecha
+     */
+    public static function cubrirRutasLibres(int $mes, int $anio): array
+    {
+        $hechas = [];
+        foreach (self::zonasSinChofer($mes, $anio) as $zona) {
+            $libres = self::with('chofer:id,name', 'zona:id,nombre')->where('mes', $mes)->where('anio', $anio)
+                ->whereNull('zona_extra_id')->get();
+            if ($libres->isEmpty()) break;
+            $elegido = $libres->firstWhere('rol_mes', 'volante')
+                ?? $libres->sortBy(fn ($a) => $a->zona_id ? self::litrosDiariosZona($a->zona_id) : 0)->first();
+            $elegido->update(['zona_extra_id' => $zona->id]);
+            $hechas[] = "{$zona->nombre} → {$elegido->chofer?->name}";
+        }
+        return $hechas;
     }
 
     /**
@@ -63,6 +179,10 @@ class AsignacionZona extends Model
                 : null;
 
             $ocupante?->update(['zona_id' => null]);   // libera la zona antes de reasignarla
+            if ($zonaId) {
+                // La zona pasa a tener titular: deja de ser la segunda ruta de quien la cubría
+                self::where('zona_extra_id', $zonaId)->where('mes', $mes)->where('anio', $anio)->update(['zona_extra_id' => null]);
+            }
 
             $inicio = Carbon::createFromDate($anio, $mes, 1);
             self::updateOrCreate(
@@ -89,109 +209,51 @@ class AsignacionZona extends Model
     // ── Lógica de rotación ────────────────────────────────────────────────────
 
     /**
-     * Genera las asignaciones del próximo mes rotando las zonas.
+     * Genera las asignaciones del mes rotando las rutas.
      *
-     * Algoritmo de rotación:
-     *   - Se obtienen las asignaciones del mes anterior.
-     *   - Cada chofer titular pasa a la zona del chofer siguiente (circular).
-     *   - El volante del mes anterior se convierte en titular en alguna zona.
-     *   - El chofer que era titular en la última zona se convierte en volante.
+     *   - Orden de rotación: [volante del mes anterior, titulares por orden de ruta, choferes nuevos].
+     *   - El volante entra a la primera ruta y cada titular avanza una; el último queda de volante.
+     *   - Si hay más rutas que choferes, las que sobran se reparten como segunda ruta
+     *     (primero al volante; ver cubrirRutasLibres).
      *
-     * @param int[] $chofereIds  IDs de los 5 choferes (en orden de rotación)
-     * @param int   $mes         Mes destino
-     * @param int   $anio        Año destino
+     * @param int[] $chofereIds  IDs de los choferes activos
      */
     public static function generarRotacion(array $chofereIds, int $mes, int $anio): array
     {
-        $zonas     = Zona::where('activa', true)->orderBy('orden')->get();
-        $numZonas  = $zonas->count();  // 4
-        $numCh     = count($chofereIds); // 5
-
-        if ($numCh < $numZonas + 1) {
-            throw new \InvalidArgumentException("Se necesitan al menos " . ($numZonas + 1) . " choferes ({$numZonas} titulares + 1 volante).");
+        $zonas = Zona::where('activa', true)->orderBy('orden')->get();
+        if (count($chofereIds) < 2) {
+            throw new \InvalidArgumentException('Se necesitan al menos 2 choferes activos (un titular y un volante).');
         }
 
-        // Obtener asignaciones del mes anterior para determinar el orden actual
-        $mesAnterior = $mes === 1 ? 12 : $mes - 1;
+        $mesAnterior  = $mes === 1 ? 12 : $mes - 1;
         $anioAnterior = $mes === 1 ? $anio - 1 : $anio;
+        $previas = self::with('zona')->where('mes', $mesAnterior)->where('anio', $anioAnterior)
+            ->whereIn('chofer_id', $chofereIds)->get();
 
-        $asigPrevias = self::where('mes', $mesAnterior)
-                          ->where('anio', $anioAnterior)
-                          ->whereIn('chofer_id', $chofereIds)
-                          ->with('zona')
-                          ->get()
-                          ->keyBy('chofer_id');
+        if ($previas->isEmpty()) {
+            $orden = array_values($chofereIds);
+        } else {
+            $volante    = $previas->firstWhere('rol_mes', 'volante')?->chofer_id;
+            $titulares  = $previas->where('rol_mes', 'titular')->sortBy(fn ($a) => $a->zona?->orden ?? 99)->pluck('chofer_id')->all();
+            $nuevos     = array_values(array_diff($chofereIds, $previas->pluck('chofer_id')->all()));
+            $otrosVol   = $previas->where('rol_mes', 'volante')->pluck('chofer_id')->reject(fn ($id) => $id === $volante)->all();
+            $orden = array_values(array_unique(array_merge($volante ? [$volante] : [], $titulares, $otrosVol, $nuevos)));
+        }
 
-        $fechaInicio = Carbon::createFromDate($anio, $mes, 1)->startOfDay();
-        $fechaFin    = $fechaInicio->copy()->endOfMonth();
+        $numTitulares = min($zonas->count(), count($orden) - 1);   // siempre queda al menos un volante
+        $inicio = Carbon::createFromDate($anio, $mes, 1)->startOfDay();
+        $base = ['mes' => $mes, 'anio' => $anio, 'fecha_inicio' => $inicio->toDateString(), 'fecha_fin' => $inicio->copy()->endOfMonth()->toDateString()];
 
         $creadas = [];
-
-        // Si no hay asignaciones previas, asignar en el orden proporcionado
-        if ($asigPrevias->isEmpty()) {
-            foreach ($zonas as $index => $zona) {
-                $creadas[] = self::create([
-                    'chofer_id'    => $chofereIds[$index],
-                    'zona_id'      => $zona->id,
-                    'mes'          => $mes,
-                    'anio'         => $anio,
-                    'rol_mes'      => 'titular',
-                    'fecha_inicio' => $fechaInicio->toDateString(),
-                    'fecha_fin'    => $fechaFin->toDateString(),
-                ]);
-            }
-            // El chofer siguiente al último titular es el volante
-            $creadas[] = self::create([
-                'chofer_id'    => $chofereIds[$numZonas],
-                'zona_id'      => null,
-                'mes'          => $mes,
-                'anio'         => $anio,
-                'rol_mes'      => 'volante',
-                'fecha_inicio' => $fechaInicio->toDateString(),
-                'fecha_fin'    => $fechaFin->toDateString(),
-            ]);
-            return $creadas;
-        }
-
-        // Rotación: el volante entra a la zona 1, todos avanzan una zona,
-        // el que estaba en la zona 4 pasa a ser volante.
-        $volantePrevio = $asigPrevias->firstWhere('rol_mes', 'volante');
-        $titularesPrevios = $asigPrevias->where('rol_mes', 'titular')
-                                        ->sortBy(fn ($a) => $a->zona?->orden ?? 99);
-
-        // Nuevo orden: [volante, titular_zona1, titular_zona2, titular_zona3] → 4 titulares
-        // El titular_zona4 se convierte en volante
-        $nuevosChoferesOrden = array_merge(
-            $volantePrevio ? [$volantePrevio->chofer_id] : [],
-            $titularesPrevios->pluck('chofer_id')->take($numZonas - 1)->toArray()
-        );
-
-        $nuevoVolante = $titularesPrevios->last()?->chofer_id;
-
-        foreach ($zonas as $index => $zona) {
-            if (!isset($nuevosChoferesOrden[$index])) continue;
-            $creadas[] = self::create([
-                'chofer_id'    => $nuevosChoferesOrden[$index],
-                'zona_id'      => $zona->id,
-                'mes'          => $mes,
-                'anio'         => $anio,
-                'rol_mes'      => 'titular',
-                'fecha_inicio' => $fechaInicio->toDateString(),
-                'fecha_fin'    => $fechaFin->toDateString(),
+        foreach ($orden as $i => $choferId) {
+            $esTitular = $i < $numTitulares;
+            $creadas[] = self::create($base + [
+                'chofer_id' => $choferId,
+                'zona_id'   => $esTitular ? $zonas[$i]->id : null,
+                'rol_mes'   => $esTitular ? 'titular' : 'volante',
             ]);
         }
-
-        if ($nuevoVolante) {
-            $creadas[] = self::create([
-                'chofer_id'    => $nuevoVolante,
-                'zona_id'      => null,
-                'mes'          => $mes,
-                'anio'         => $anio,
-                'rol_mes'      => 'volante',
-                'fecha_inicio' => $fechaInicio->toDateString(),
-                'fecha_fin'    => $fechaFin->toDateString(),
-            ]);
-        }
+        self::cubrirRutasLibres($mes, $anio);
 
         return $creadas;
     }

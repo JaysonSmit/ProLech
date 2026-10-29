@@ -278,8 +278,7 @@ class OperacionesController extends Controller
     /** Notificación al chofer titular de la ruta este mes (queda en sus notificaciones). */
     private function avisarChofer(Zona $zona, string $mensaje): void
     {
-        $choferId = AsignacionZona::where('zona_id', $zona->id)
-            ->where('mes', now()->month)->where('anio', now()->year)->value('chofer_id');
+        $choferId = AsignacionZona::choferDeZona($zona->id);
         if ($choferId) {
             \App\Models\Notificacion::enviar(
                 userId: $choferId, titulo: '🔄 Cambió tu ruta', mensaje: $mensaje, tipo: 'ruta_cambiada', referenciaId: $zona->id,
@@ -290,9 +289,11 @@ class OperacionesController extends Controller
     /** zona_id → chofer titular del mes actual. */
     private function titularesDelMes(): array
     {
-        return AsignacionZona::with('chofer:id,name')
-            ->where('mes', now()->month)->where('anio', now()->year)->whereNotNull('zona_id')->get()
-            ->mapWithKeys(fn ($a) => [$a->zona_id => ['id' => $a->chofer_id, 'nombre' => $a->chofer?->name]])
+        $asig = AsignacionZona::with('chofer:id,name')->where('mes', now()->month)->where('anio', now()->year)->get();
+        // Primero las segundas rutas para que el titular (si lo hay) las sobrescriba
+        return $asig->whereNotNull('zona_extra_id')
+            ->mapWithKeys(fn ($a) => [$a->zona_extra_id => ['id' => $a->chofer_id, 'nombre' => $a->chofer?->name . ' (2.ª ruta)']])
+            ->union($asig->whereNotNull('zona_id')->mapWithKeys(fn ($a) => [$a->zona_id => ['id' => $a->chofer_id, 'nombre' => $a->chofer?->name]]))
             ->all();
     }
 
