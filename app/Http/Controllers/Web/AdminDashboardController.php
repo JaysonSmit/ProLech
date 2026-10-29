@@ -205,6 +205,11 @@ class AdminDashboardController extends Controller
         $despachosPendientes = Venta::vigentes()->where('estado_despacho', 'preparacion')->count();
         $despachosEnCamino   = Venta::vigentes()->where('estado_despacho', 'en_camino')->count();
         $despachosEntregados = Venta::vigentes()->where('estado_despacho', 'entregado')->count();
+        // Pedidos de la tienda web que aún no se entregan (para despacharlos desde aquí)
+        $pedidosWebActivos = \App\Models\PedidoWeb::with('detalles.producto:id,nombre')
+            ->whereIn('estado_pedido', ['Pendiente', 'Pagado', 'Enviado'])
+            ->orderByRaw("CASE estado_pedido WHEN 'Pagado' THEN 0 WHEN 'Pendiente' THEN 1 ELSE 2 END")
+            ->oldest()->get();
 
         $precios = [
             'mayorista' => Venta::precioParaTipo('mayorista'),
@@ -222,7 +227,7 @@ class AdminDashboardController extends Controller
             'ventas', 'catalogo', 'resumenMes', 'resumenDestino', 'precios', 'dashboard',
             'stockActualQuesos', 'stockMinimoQuesos', 'alertaStockQuesos',
             'despachosPendientes', 'despachosEnCamino', 'despachosEntregados',
-            'destinoFiltro', 'despachoFiltro'
+            'destinoFiltro', 'despachoFiltro', 'pedidosWebActivos'
         ));
     }
 

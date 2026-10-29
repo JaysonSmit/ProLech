@@ -160,9 +160,9 @@
                     <div class="form-group" style="margin-bottom:14px;">
                         <label for="estado_pedido">Nuevo estado</label>
                         <select id="estado_pedido" name="estado_pedido">
-                            @foreach(['Pendiente','Pagado','Enviado','Cancelado'] as $e)
+                            @foreach(['Pendiente' => 'Pendiente', 'Pagado' => 'Pagado', 'Enviado' => 'En camino (despachado)', 'Entregado' => 'Entregado', 'Cancelado' => 'Cancelado'] as $e => $txt)
                                 <option value="{{ $e }}" {{ $pedido->estado_pedido === $e ? 'selected' : '' }}>
-                                    {{ $e }}
+                                    {{ $txt }}
                                 </option>
                             @endforeach
                         </select>

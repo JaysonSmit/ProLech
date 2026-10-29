@@ -118,4 +118,28 @@ class TiendaSeguimientoYSunatTest extends TestCase
         $this->assertSame('rechazada', $mal->fresh()->sunat_estado, (string) $mal->fresh()->sunat_mensaje);
         $this->assertStringContainsString('ya existe', $mal->fresh()->sunat_mensaje);
     }
+
+    public function test_despacho_del_pedido_web_desde_ventas_hasta_la_entrega(): void
+    {
+        $pedido = $this->comprar();
+        $despacho = User::factory()->create(['rol' => 'despacho', 'activo' => true]);
+        $como = fn () => $this->actingAs($despacho)->withSession(['2fa_verified' => true]);
+
+        $como()->get('/admin/ventas')->assertOk()->assertSee($pedido->codigo_pedido)->assertSee('Confirmar pago');
+
+        foreach (['Pagado', 'Enviado', 'Entregado'] as $estado) {
+            $como()->post("/admin/ventas/pedidos-web/{$pedido->id}/estado", ['estado_pedido' => $estado, 'notas_despacho' => 'Moto de Julio'])
+                   ->assertRedirect();
+            $this->assertSame($estado, $pedido->fresh()->estado_pedido);
+        }
+        $p = $pedido->fresh();
+        $this->assertNotNull($p->despachado_at);
+        $this->assertNotNull($p->entregado_at);
+        $this->assertSame('Moto de Julio', $p->notas_despacho);
+        $this->assertStringContainsString('fue entregado', $p->mensajeEstado());
+
+        // El cliente ve los 4 pasos encendidos y el pedido sale de la lista por despachar
+        $this->get('/tienda/seguimiento?codigo=' . $p->codigo_pedido . '&telefono=321')->assertOk()->assertSee('Entregado');
+        $como()->get('/admin/ventas')->assertDontSee('Marcar entregado');
+    }
 }

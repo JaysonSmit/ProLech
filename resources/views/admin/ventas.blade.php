@@ -188,6 +188,54 @@
     </div>
 </details>
 
+{{-- ── Pedidos de la tienda web por despachar ─────────────────────────────────── --}}
+<div class="card" id="pedidos-web-despacho" style="margin-bottom:20px">
+    <div class="card-header" style="flex-wrap:wrap;gap:10px">
+        <div>
+            <h3>🛒 Pedidos de la tienda web por despachar</h3>
+            <span class="card-header-meta">Pago → Despacho → Entrega. Cada paso avisa al cliente por WhatsApp y actualiza «Seguir mi pedido».</span>
+        </div>
+        <span class="tag">{{ $pedidosWebActivos->count() }} activo(s)</span>
+    </div>
+    @if($pedidosWebActivos->isEmpty())
+        <div style="padding:16px 22px;color:var(--text-muted);font-size:.88rem">No hay pedidos web pendientes de entrega. 🎉</div>
+    @else
+    <div class="table-wrap">
+        <table style="width:100%">
+            <thead><tr>
+                <th>Pedido</th><th>Cliente</th><th>Productos</th><th>Pago</th><th>Total</th><th>Estado</th><th>Siguiente paso</th>
+            </tr></thead>
+            <tbody>
+            @foreach($pedidosWebActivos as $pw)
+                @php $b = $pw->estado_badge; $sig = $pw->siguienteEstado(); @endphp
+                <tr>
+                    <td><strong>{{ $pw->codigo_pedido }}</strong><br><small style="color:var(--text-muted)">{{ $pw->created_at->format('d/m H:i') }}</small></td>
+                    <td>{{ $pw->cliente_nombre }}<br><small style="color:var(--text-muted)">📞 {{ $pw->cliente_telefono }} · {{ $pw->cliente_direccion }}</small></td>
+                    <td style="font-size:.8rem">@foreach($pw->detalles as $d){{ $d->cantidad }} × {{ $d->producto?->nombre ?? 'Producto' }}@if(! $loop->last)<br>@endif @endforeach</td>
+                    <td style="font-size:.8rem">{{ $pw->metodo_pago }}</td>
+                    <td><strong>S/ {{ number_format($pw->total, 2) }}</strong></td>
+                    <td><span class="badge" style="background:{{ $b['bg'] }};color:{{ $b['color'] }}">{{ $b['label'] }}</span>
+                        @if($pw->despachado_at)<br><small style="color:var(--text-muted)">salió {{ $pw->despachado_at->format('d/m H:i') }}</small>@endif</td>
+                    <td>
+                        @if($sig)
+                        <form method="POST" action="{{ route('admin.ventas.pedidos-web.estado', $pw) }}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                            @csrf
+                            <input type="hidden" name="estado_pedido" value="{{ $sig }}">
+                            @if($sig === 'Enviado')
+                                <input name="notas_despacho" maxlength="250" placeholder="Repartidor / notas" style="width:130px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:.78rem">
+                            @endif
+                            <button class="btn btn-sm btn-primary">{{ \App\Models\PedidoWeb::ACCION_SIGUIENTE[$sig] }}</button>
+                        </form>
+                        @endif
+                    </td>
+                </tr>
+            @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
+</div>
+
 {{-- ── Historial de ventas y despachos con filtros ──────────────────────────── --}}
 <div class="card" id="historial-ventas">
     <div class="card-header" style="flex-wrap:wrap;gap:12px">

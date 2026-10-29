@@ -204,7 +204,8 @@ class AdminTiendaController extends Controller
     public function pedidosEstado(Request $request, PedidoWeb $pedido): RedirectResponse
     {
         $request->validate([
-            'estado_pedido' => ['required', Rule::in(['Pendiente', 'Pagado', 'Enviado', 'Cancelado'])],
+            'estado_pedido'  => ['required', Rule::in(['Pendiente', 'Pagado', 'Enviado', 'Entregado', 'Cancelado'])],
+            'notas_despacho' => ['nullable', 'string', 'max:250'],
         ]);
 
         $anterior = $pedido->estado_pedido;
@@ -226,7 +227,12 @@ class AdminTiendaController extends Controller
                 }
                 $pedido->moverStock(-1);
             }
-            $pedido->update(['estado_pedido' => $nuevo]);
+            $pedido->update(array_filter([
+                'estado_pedido'  => $nuevo,
+                'despachado_at'  => $nuevo === 'Enviado' && ! $pedido->despachado_at ? now() : null,
+                'entregado_at'   => $nuevo === 'Entregado' ? now() : null,
+                'notas_despacho' => request('notas_despacho') ?: null,
+            ], fn ($v) => $v !== null));
         });
 
         // Aviso automático al cliente (Ultramsg; sin credenciales solo se registra en el log)
@@ -236,7 +242,7 @@ class AdminTiendaController extends Controller
 
         return back()->with(
             'success',
-            "✅ Pedido {$pedido->codigo_pedido} marcado como {$nuevo}. Se avisó al cliente por WhatsApp."
+            "✅ Pedido {$pedido->codigo_pedido} marcado como " . $pedido->fresh()->estado_badge['label'] . '. Se avisó al cliente por WhatsApp.'
         );
     }
 
