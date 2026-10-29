@@ -157,6 +157,7 @@ Route::middleware(['auth', 'rol:admin,calidad,asistente,jefe_produccion,despacho
 
     Route::middleware('seccion:ganaderos')->group(function () {
         Route::get('ganaderos', [GanaderoController::class, 'index'])->name('ganaderos.index');
+        Route::get('ganaderos/{ganadero}', [GanaderoController::class, 'show'])->whereNumber('ganadero')->name('ganaderos.show');
     });
 
     Route::middleware('seccion:reclamos')->group(function () {
