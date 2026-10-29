@@ -272,15 +272,16 @@ class ChoferAppController extends Controller
         /** @var \App\Models\User $user */
         $user = $request->user();
 
+        // ?todas=1 → también las leídas (la bandeja de avisos de la app); por defecto solo las no leídas
         $notificaciones = $user->notificaciones()
-                               ->noLeidas()
+                               ->when(! $request->boolean('todas'), fn ($q) => $q->noLeidas())
                                ->orderByDesc('created_at')
                                ->limit(50)
-                               ->get(['id', 'titulo', 'mensaje', 'tipo', 'referencia_id', 'created_at']);
+                               ->get(['id', 'titulo', 'mensaje', 'tipo', 'referencia_id', 'leida', 'created_at']);
 
         return response()->json([
-            'notificaciones' => $notificaciones,
-            'total_no_leidas' => $notificaciones->count(),
+            'notificaciones'  => $notificaciones,
+            'total_no_leidas' => $user->notificaciones()->noLeidas()->count(),
         ]);
     }
 

@@ -108,10 +108,11 @@ class ReunionController extends Controller
             ->filter() // quitar nulls
             ->values();
 
-        // ── Attach al pivot solo los explícitos ───────────────────────────────
-        if ($invitadosExplicitos->isNotEmpty()) {
+        // ── Todos los avisados quedan como invitados: así la reunión aparece en
+        //    GET /api/reuniones del chofer (antes solo los elegidos a mano) ──────
+        if ($todosIds->isNotEmpty()) {
             $reunion->invitados()->attach(
-                $invitadosExplicitos->mapWithKeys(fn ($id) => [
+                $todosIds->mapWithKeys(fn ($id) => [
                     $id => ['notificado' => true, 'confirmado' => false]
                 ])->all()
             );
