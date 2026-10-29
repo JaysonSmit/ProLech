@@ -224,7 +224,8 @@ private fun Encabezado(state: MiRutaUiState, onActualizar: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(
                     when (ruta.origenRuta) {
-                        "zona" -> "TU ZONA ESTE MES" + if (ruta.rolMes == "titular") " · TITULAR" else ""
+                        "zona" -> (if (ruta.variasRutas) "TUS 2 RUTAS ESTE MES" else "TU ZONA ESTE MES") +
+                            if (ruta.rolMes == "titular") " · TITULAR" else if (ruta.rolMes == "volante") " · VOLANTE" else ""
                         "manual" -> "RUTA ASIGNADA"
                         else -> "RUTA DEL DÍA"
                     },
@@ -266,6 +267,10 @@ private fun Encabezado(state: MiRutaUiState, onActualizar: () -> Unit) {
                 color = colorCarga(carga.toDouble()),
                 trackColor = Color.White.copy(alpha = .15f)
             )
+        }
+        ruta.avisoCapacidad?.let {
+            Spacer(Modifier.height(8.dp))
+            Text("⚠️ $it", color = Color(0xFFFFD27A), fontSize = 12.sp)
         }
         TextButton(onClick = onActualizar, modifier = Modifier.align(Alignment.End)) {
             Text("↻ Actualizar ruta", color = Color(0xFF9EC5FF))
@@ -379,6 +384,7 @@ private fun FilaParada(
                 Text(mk.parada.ganaderoNombre, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     listOfNotNull(
+                        mk.parada.ruta?.takeIf { state.ruta?.ruta?.variasRutas == true }?.let { "🗺️ $it" },
                         mk.parada.direccion,
                         if (mk.parada.coordenada == null) "sin GPS" else distancia?.let { "${formato(it, 1)} km" }
                     ).joinToString(" · "),

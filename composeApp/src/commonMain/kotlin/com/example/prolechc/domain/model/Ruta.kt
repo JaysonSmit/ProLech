@@ -16,8 +16,13 @@ data class Ruta(
     /** "titular", "volante" o "sin_asignar" en la rotación del mes. */
     val rolMes: String = "",
     /** Camino que el administrador trazó en el panel; vacío = la app calcula uno. */
-    val trazado: List<Coordenada> = emptyList()
-)
+    val trazado: List<Coordenada> = emptyList(),
+    /** Aviso del servidor cuando sus 2 rutas superan la capacidad del camión. */
+    val avisoCapacidad: String? = null
+) {
+    /** El chofer recorre más de una ruta este mes (hay más rutas que choferes). */
+    val variasRutas: Boolean get() = paradas.mapNotNull { it.ruta }.distinct().size > 1
+}
 
 data class Parada(
     val id: Int,
@@ -34,5 +39,7 @@ data class Parada(
     /** Entregas que aún no puede hacer por una sanción de calidad */
     val bloqueado: Int = 0,
     /** Frasco de muestra sorpresa de hoy (solo se muestra al registrar la entrega) */
-    val muestra: String? = null
+    val muestra: String? = null,
+    /** Ruta a la que pertenece la parada (cuando el chofer recorre dos) */
+    val ruta: String? = null
 )

@@ -20,7 +20,9 @@ data class MiRutaResponseDto(
     @SerialName("origen_ruta")       val origenRuta: String?        = null,
     @SerialName("rol_mes")           val rolMes: String?            = null,
     /** Camino trazado por el administrador en el panel: [[lat, lon], ...] */
-    @SerialName("trazado")           val trazado: List<List<Double>>? = null
+    @SerialName("trazado")           val trazado: List<List<Double>>? = null,
+    /** Aviso si las 2 rutas del chofer superan la capacidad del camión. */
+    @SerialName("aviso_capacidad")   val avisoCapacidad: String? = null
 )
 
 @Serializable
@@ -58,5 +60,6 @@ data class ParadaDto(
     @SerialName("atendido")        val atendido: Boolean   = false,
     @SerialName("suspendido")      val suspendido: Boolean = false,
     @SerialName("bloqueado")       val bloqueado: Int = 0,
+    @SerialName("ruta")            val ruta: String? = null,
     @SerialName("muestra")         val muestra: String? = null
 )

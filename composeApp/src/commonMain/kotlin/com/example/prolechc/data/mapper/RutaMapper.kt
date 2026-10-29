@@ -35,7 +35,8 @@ fun MiRutaResponseDto.toDomain(): Ruta {
             atendido       = p.atendido,
             suspendido     = p.suspendido,
             bloqueado      = p.bloqueado,
-            muestra        = p.muestra
+            muestra        = p.muestra,
+            ruta           = p.ruta
         )
     }
 
@@ -53,6 +54,7 @@ fun MiRutaResponseDto.toDomain(): Ruta {
         planta          = planta?.let { Coordenada(it.lat, it.lon) },
         origenRuta      = origenRuta.orEmpty(),
         rolMes          = rolMes.orEmpty(),
-        trazado         = trazado.orEmpty().filter { it.size >= 2 }.map { Coordenada(it[0], it[1]) }
+        trazado         = trazado.orEmpty().filter { it.size >= 2 }.map { Coordenada(it[0], it[1]) },
+        avisoCapacidad  = avisoCapacidad
     )
 }
