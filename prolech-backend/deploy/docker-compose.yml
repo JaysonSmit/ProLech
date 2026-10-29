@@ -1,0 +1,52 @@
+# ProLech en producción: Caddy (HTTPS automático) + Laravel (PHP-FPM) + MySQL 8.
+# Uso (ver DEPLOY.md):  cp deploy/.env.production.example .env  → editar → cd deploy → docker compose up -d --build
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: app
+    restart: unless-stopped
+    env_file: ../.env
+    volumes:
+      # Fotos de evidencia, comprobantes Yape e imágenes de productos sobreviven a las actualizaciones
+      - storage:/var/www/html/storage/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?Define DOMINIO, por ejemplo api.prolech.pe}
+    volumes:
+      - storage:/var/www/html/storage/app:ro
+      - caddy_datos:/data
+    depends_on: [app]
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-prolech}
+      MYSQL_USER: ${DB_USERNAME:-prolech}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 20
+
+volumes:
+  storage:
+  mysql:
+  caddy_datos:
