@@ -28,9 +28,13 @@ import com.example.prolechc.viewmodel.ProLechViewModel
 fun DashboardScreen(
     viewModel: ProLechViewModel,
     onNuevoAcopio: () -> Unit,
+    onModoBatch: () -> Unit = {},
     onHistorial: () -> Unit,
     onSincronizar: () -> Unit,
     onMiRuta: () -> Unit,
+    onNotificaciones: () -> Unit = {},
+    onReuniones: (() -> Unit)? = null,
+    notificacionesCount: Int = 0,
     onBottomDashboard: () -> Unit,
     onBottomAcopio: () -> Unit,
     onBottomRuta: () -> Unit,
@@ -54,7 +58,6 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .systemBarsPadding()
         ) {
             // ── TopBar ─────────────────────────────────────────────────────
             Row(
@@ -77,7 +80,42 @@ fun DashboardScreen(
                         Text("·15.632, -70.104", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
                     }
                 }
-                Text("ProLech", color = GreenAccent, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+
+                // Título + campana con badge
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("ProLech", color = GreenAccent, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+
+                    // ── Campana de notificaciones con badge ─────────────────
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                            .background(Color.White.copy(alpha = 0.10f))
+                            .clickable(onClick = onNotificaciones),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🔔", fontSize = 18.sp)
+                        // Badge rojo cuando hay notificaciones no leídas
+                        if (notificacionesCount > 0) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 2.dp, y = (-2).dp)
+                                    .size(if (notificacionesCount > 9) 18.dp else 14.dp)
+                                    .clip(androidx.compose.foundation.shape.CircleShape)
+                                    .background(Color(0xFFE53935)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (notificacionesCount > 9) "9+" else notificacionesCount.toString(),
+                                    color      = Color.White,
+                                    fontSize   = 8.sp,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Column(
@@ -146,6 +184,20 @@ fun DashboardScreen(
                     )
                     DashButton(
                         modifier    = Modifier.weight(1f),
+                        icon        = "⚡",
+                        label       = "Modo Rápido",
+                        sub         = "Varios a la vez",
+                        bg          = Color(0xFFFFF3E0),
+                        border      = Color(0xFFF57F17),
+                        iconColor   = Color(0xFFF57F17),
+                        onClick     = onModoBatch
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val totalAcopios by viewModel.acopiosSession.collectAsStateWithLifecycle()
+                    DashButton(
+                        modifier    = Modifier.weight(1f),
                         icon        = "☰",
                         label       = "Historial Hoy",
                         sub         = "Acopios realizados",
@@ -153,10 +205,26 @@ fun DashboardScreen(
                         border      = BluePrimary,
                         iconColor   = BluePrimary,
                         onClick     = onHistorial,
-                        badge       = "${mockAcopios.size}"
+                        badge       = if (totalAcopios.isNotEmpty()) "${totalAcopios.size}" else null
                     )
+                    if (onReuniones != null) {
+                        DashButton(
+                            modifier    = Modifier.weight(1f),
+                            icon        = "📅",
+                            label       = "Reuniones",
+                            sub         = "Capacitaciones",
+                            bg          = GreenBg,
+                            border      = GreenBorder,
+                            iconColor   = GreenPrimary,
+                            onClick     = onReuniones
+                        )
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
+                val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+                val sessionAcopios by viewModel.acopiosSession.collectAsStateWithLifecycle()
+                val pendientesReal = sessionAcopios.count { it.syncEstado == com.example.prolechc.data.EstadoSync.PENDIENTE }
+
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     DashButton(
                         modifier    = Modifier.weight(1f),
@@ -167,7 +235,7 @@ fun DashboardScreen(
                         border      = AmberPrimary,
                         iconColor   = AmberPrimary,
                         onClick     = onSincronizar,
-                        badge       = "${pendientesSync} Pend."
+                        badge       = if (pendientesReal > 0) "$pendientesReal Pend." else null
                     )
                     DashButton(
                         modifier    = Modifier.weight(1f),
@@ -195,36 +263,56 @@ fun DashboardScreen(
                 }
                 Spacer(Modifier.height(8.dp))
 
-                mockAcopios.take(3).forEach { acopio ->
-                    val (color, bg, label) = when (acopio.estado) {
-                        EstadoAcopio.APROBADO  -> Triple(GreenPrimary, GreenBg,  "APROBADO")
-                        EstadoAcopio.RECHAZADO -> Triple(RedPrimary,   RedBg,    "RECHAZADO")
-                        EstadoAcopio.OBSERVADO -> Triple(AmberPrimary, AmberBg,  "OBSERVADO")
-                    }
-                    Card(
-                        modifier  = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        colors    = CardDefaults.cardColors(containerColor = BgCard),
-                        shape     = RoundedCornerShape(10.dp),
-                        elevation = CardDefaults.cardElevation(1.dp)
+                val ultimosAcopios by viewModel.acopiosSession.collectAsStateWithLifecycle()
+                val acopiosMostrar = if (ultimosAcopios.isEmpty()) emptyList() else ultimosAcopios.take(3)
+
+                if (acopiosMostrar.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(BgCard)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Text("Sin acopios registrados hoy", color = TextMuted, fontSize = 12.sp)
+                    }
+                } else {
+                    acopiosMostrar.forEach { acopio ->
+                        val (color, bg, label) = when (acopio.estado) {
+                            EstadoAcopio.APROBADO  -> Triple(GreenPrimary, GreenBg,  "APROBADO")
+                            EstadoAcopio.RECHAZADO -> Triple(RedPrimary,   RedBg,    "RECHAZADO")
+                            EstadoAcopio.OBSERVADO -> Triple(AmberPrimary, AmberBg,  "OBSERVADO")
+                        }
+                        Card(
+                            modifier  = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors    = CardDefaults.cardColors(containerColor = BgCard),
+                            shape     = RoundedCornerShape(10.dp),
+                            elevation = CardDefaults.cardElevation(1.dp)
                         ) {
-                            Box(
-                                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(bg),
-                                contentAlignment = Alignment.Center
-                            ) { Text(if (acopio.estado == EstadoAcopio.APROBADO) "✓" else if (acopio.estado == EstadoAcopio.RECHAZADO) "✗" else "!",
-                                color = color, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold) }
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(acopio.ganaderoNombre, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text("${acopio.hora}  ·  DNI: ${acopio.dniGanadero}", color = TextMuted, fontSize = 10.sp)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text("${acopio.litros} L", color = GreenPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                                Box(Modifier.clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                                    Text(label, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(bg),
+                                    contentAlignment = Alignment.Center
+                                ) { Text(if (acopio.estado == EstadoAcopio.APROBADO) "✓" else if (acopio.estado == EstadoAcopio.RECHAZADO) "✗" else "!",
+                                    color = color, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold) }
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(acopio.ganaderoNombre, color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Row {
+                                        Text(acopio.hora, color = TextMuted, fontSize = 10.sp)
+                                        if (acopio.dniGanadero.isNotBlank()) {
+                                            Text("  ·  DNI: ${acopio.dniGanadero}", color = TextMuted, fontSize = 10.sp)
+                                        }
+                                    }
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("${acopio.litros} L", color = GreenPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                                    Box(Modifier.clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                                        Text(label, color = color, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }

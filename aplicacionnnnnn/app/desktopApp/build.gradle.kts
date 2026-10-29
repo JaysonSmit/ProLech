@@ -12,7 +12,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(libs.kotlinx.coroutinesSwing)
 
-    implementation(libs.compose.uiToolingPreview)
+    implementation(libs.kmp.compose.uiToolingPreview)
 }
 
 compose.desktop {

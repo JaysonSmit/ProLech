@@ -17,3 +17,14 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Archivos sueltos / comprimidos que no son código
+siuuuu
+*.tar.xz
+*.rar
+*.zip
+*.log
+# Llaves de firma del APK (NUNCA subirlas)
+*.jks
+*.keystore
+keystore.properties

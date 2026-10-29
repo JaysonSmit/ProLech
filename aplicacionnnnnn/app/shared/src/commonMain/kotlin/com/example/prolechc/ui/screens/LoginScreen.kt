@@ -1,35 +1,54 @@
 package com.example.prolechc.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.prolechc.data.mockConductores
 import com.example.prolechc.ui.theme.*
 import com.example.prolechc.viewmodel.ProLechViewModel
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  LoginScreen — Autenticación real con Laravel Sanctum
+//
+//  Misma paleta y estilo visual que la app original.
+//  Ahora con campos Email + Contraseña en lugar de los selectores mock.
+//  El botón "INICIAR RUTA" llama a viewModel.login() que hace POST /api/login.
+// ══════════════════════════════════════════════════════════════════════════════
 
 @Composable
 fun LoginScreen(
     viewModel: ProLechViewModel,
     onIniciarRuta: () -> Unit
 ) {
-    val state by viewModel.loginState.collectAsStateWithLifecycle()
-    var conductorExp by remember { mutableStateOf(false) }
-    var vehiculoExp  by remember { mutableStateOf(false) }
-    var rutaExp      by remember { mutableStateOf(false) }
+    val state        by viewModel.loginState.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
+    var showPassword by remember { mutableStateOf(false) }
+
+    // Navegar automáticamente cuando el login sea exitoso
+    LaunchedEffect(state.rutaIniciada) {
+        if (state.rutaIniciada) onIniciarRuta()
+    }
 
     Column(
         modifier = Modifier
@@ -37,14 +56,14 @@ fun LoginScreen(
             .background(BgPage)
             .systemBarsPadding()
     ) {
-        // ── TopBar verde oscuro ───────────────────────────────────────────
+        // ── TopBar verde oscuro ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(SurfaceDark)
                 .padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalAlignment         = Alignment.CenterVertically,
+            horizontalArrangement     = Arrangement.SpaceBetween
         ) {
             Column {
                 Text("Control de Acopio", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -54,21 +73,21 @@ fun LoginScreen(
         }
 
         Column(
-            modifier = Modifier
+            modifier              = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment   = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(32.dp))
 
-            // ── Logo ──────────────────────────────────────────────────────
+            // ── Logo ──────────────────────────────────────────────────────────
             Box(
-                modifier = Modifier
+                modifier           = Modifier
                     .size(96.dp)
                     .clip(CircleShape)
                     .background(GreenBg)
                     .border(2.5.dp, GreenPrimary, CircleShape),
-                contentAlignment = Alignment.Center
+                contentAlignment   = Alignment.Center
             ) {
                 Text("PL", color = GreenPrimary, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
             }
@@ -78,59 +97,108 @@ fun LoginScreen(
 
             Spacer(Modifier.height(28.dp))
             HorizontalDivider(color = Divider)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            // ── Selectores ────────────────────────────────────────────────
-            LoginSelectorLabel("CHOFER / TRANSPORTISTA")
+            // ── Campo Email ───────────────────────────────────────────────────
+            Text(
+                "CORREO ELECTRÓNICO",
+                color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.fillMaxWidth()
+            )
             Spacer(Modifier.height(6.dp))
-            Box {
-                LoginDropCard(value = state.conductorNombre, onClick = { conductorExp = true })
-                DropdownMenu(expanded = conductorExp, onDismissRequest = { conductorExp = false },
-                    modifier = Modifier.background(BgCard)) {
-                    mockConductores.forEachIndexed { i, c ->
-                        DropdownMenuItem(
-                            text    = { Text(c.nombre, color = TextPrimary, fontSize = 13.sp) },
-                            onClick = { viewModel.onConductorChange(i); conductorExp = false }
+            OutlinedTextField(
+                value         = state.email,
+                onValueChange = { viewModel.onEmailChange(it) },
+                placeholder   = { Text("conductor@prolech.com", color = TextDim, fontSize = 13.sp) },
+                singleLine    = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction    = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                ),
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(10.dp),
+                colors   = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = GreenPrimary,
+                    unfocusedBorderColor = Divider,
+                    focusedTextColor     = TextPrimary,
+                    unfocusedTextColor   = TextPrimary,
+                    cursorColor          = GreenPrimary
+                ),
+                enabled = !state.isLoading
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // ── Campo Contraseña ──────────────────────────────────────────────
+            Text(
+                "CONTRASEÑA",
+                color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(6.dp))
+            OutlinedTextField(
+                value         = state.password,
+                onValueChange = { viewModel.onPasswordChange(it) },
+                placeholder   = { Text("••••••••", color = TextDim, fontSize = 13.sp) },
+                singleLine    = true,
+                visualTransformation = if (showPassword) VisualTransformation.None
+                                       else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction    = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        focusManager.clearFocus()
+                        if (!state.isLoading) viewModel.login()
+                    }
+                ),
+                trailingIcon = {
+                    TextButton(onClick = { showPassword = !showPassword }) {
+                        Text(
+                            if (showPassword) "OCULTAR" else "VER",
+                            color = GreenPrimary, fontSize = 10.sp, fontWeight = FontWeight.Bold
                         )
                     }
-                }
-            }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape    = RoundedCornerShape(10.dp),
+                colors   = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = GreenPrimary,
+                    unfocusedBorderColor = Divider,
+                    focusedTextColor     = TextPrimary,
+                    unfocusedTextColor   = TextPrimary,
+                    cursorColor          = GreenPrimary
+                ),
+                enabled = !state.isLoading
+            )
 
-            Spacer(Modifier.height(14.dp))
-            LoginSelectorLabel("CAMIÓN / PLACA")
-            Spacer(Modifier.height(6.dp))
-            Box {
-                LoginDropCard(value = state.vehiculo, onClick = { vehiculoExp = true })
-                DropdownMenu(expanded = vehiculoExp, onDismissRequest = { vehiculoExp = false },
-                    modifier = Modifier.background(BgCard)) {
-                    mockConductores.forEachIndexed { i, c ->
-                        DropdownMenuItem(
-                            text    = { Text(c.vehiculo, color = TextPrimary, fontSize = 13.sp) },
-                            onClick = { viewModel.onConductorChange(i); vehiculoExp = false }
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.height(10.dp))
 
-            Spacer(Modifier.height(14.dp))
-            LoginSelectorLabel("RUTA ASIGNADA")
-            Spacer(Modifier.height(6.dp))
-            Box {
-                LoginDropCard(value = state.ruta, onClick = { rutaExp = true })
-                DropdownMenu(expanded = rutaExp, onDismissRequest = { rutaExp = false },
-                    modifier = Modifier.background(BgCard)) {
-                    mockConductores.forEachIndexed { i, c ->
-                        DropdownMenuItem(
-                            text    = { Text(c.ruta, color = TextPrimary, fontSize = 13.sp) },
-                            onClick = { viewModel.onConductorChange(i); rutaExp = false }
-                        )
-                    }
+            // ── Error de login ────────────────────────────────────────────────
+            AnimatedVisibility(visible = state.error != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(RedBg)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("✕  ", color = RedPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        state.error ?: "",
+                        color = RedPrimary, fontSize = 12.sp
+                    )
                 }
             }
 
             Spacer(Modifier.weight(1f))
 
-            // ── Alerta offline ────────────────────────────────────────────
+            // ── Aviso de conexión al servidor ─────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -140,56 +208,53 @@ fun LoginScreen(
                     .padding(12.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                Text("⚠  ", color = AmberPrimary, fontSize = 15.sp)
+                Text("⚡  ", color = AmberPrimary, fontSize = 15.sp)
                 Column {
-                    Text("Modo Offline Activo", color = AmberText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("Puedes registrar acopios sin internet.\nSincroniza antes de salir.",
-                        color = AmberText.copy(alpha = 0.85f), fontSize = 11.sp)
+                    Text("Modo Online", color = AmberText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Conectado a la API ProLech.\nIngresa tus credenciales para iniciar.",
+                        color = AmberText.copy(alpha = 0.85f), fontSize = 11.sp
+                    )
                 }
             }
 
             Spacer(Modifier.height(14.dp))
 
-            // ── Botón Iniciar Ruta ────────────────────────────────────────
+            // ── Botón Iniciar Ruta ────────────────────────────────────────────
             Button(
-                onClick  = { viewModel.iniciarRuta(); onIniciarRuta() },
+                onClick  = {
+                    focusManager.clearFocus()
+                    viewModel.login()
+                },
+                enabled  = !state.isLoading && state.email.isNotBlank() && state.password.isNotBlank(),
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape    = RoundedCornerShape(12.dp),
-                colors   = ButtonDefaults.buttonColors(containerColor = GreenPrimary, contentColor = Color.White)
+                colors   = ButtonDefaults.buttonColors(
+                    containerColor  = GreenPrimary,
+                    contentColor    = Color.White,
+                    disabledContainerColor = GreenPrimary.copy(alpha = 0.5f),
+                    disabledContentColor   = Color.White.copy(alpha = 0.6f)
+                )
             ) {
-                Text("▶  INICIAR RUTA", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier  = Modifier.size(24.dp),
+                        color     = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text("AUTENTICANDO...", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    Text("▶  INICIAR RUTA", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                }
             }
 
             Spacer(Modifier.height(12.dp))
             Text(
-                "Última Sincronización: 07/02/2026 06:12 AM\nProLech Android v1.4.2 · Com Trapel",
+                "ProLech Android v1.4.2 · API Laravel Sanctum",
                 color = TextDim, fontSize = 10.sp, textAlign = TextAlign.Center
             )
             Spacer(Modifier.height(18.dp))
         }
-    }
-}
-
-@Composable
-private fun LoginSelectorLabel(text: String) {
-    Text(text, color = TextMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth())
-}
-
-@Composable
-private fun LoginDropCard(value: String, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(BgCard)
-            .border(1.dp, Divider, RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment     = Alignment.CenterVertically
-    ) {
-        Text(value, color = TextPrimary, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Text("▾", color = TextMuted, fontSize = 16.sp)
     }
 }

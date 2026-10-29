@@ -1,0 +1,7 @@
+-- Migración v4 → v5: el chofer ya no mide calidad. Observación a simple vista, frasco de
+-- muestra sorpresa y bloqueo por calidad de cada ganadero.
+ALTER TABLE AcopioEntity ADD COLUMN observacion TEXT;
+ALTER TABLE AcopioEntity ADD COLUMN observacionNota TEXT;
+ALTER TABLE AcopioEntity ADD COLUMN muestraCodigo TEXT;
+ALTER TABLE GanaderoEntity ADD COLUMN bloqueado INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE GanaderoEntity ADD COLUMN muestra TEXT;
