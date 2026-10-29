@@ -143,6 +143,8 @@ Route::middleware(['auth', 'rol:admin,calidad,asistente,jefe_produccion,despacho
         Route::get('ventas',  [AdminDashboardController::class, 'ventas'])->name('ventas');
         Route::post('ventas', [AdminDashboardController::class, 'ventasStore'])->name('ventas.store');
         Route::post('ventas/{venta}/despacho', [AdminDashboardController::class, 'actualizarDespacho'])->name('ventas.despacho.update');
+        Route::get('ventas/{venta}/comprobante', [AdminDashboardController::class, 'comprobanteVenta'])->name('ventas.comprobante');
+        Route::post('ventas/{venta}/anular', [AdminDashboardController::class, 'anularVenta'])->name('ventas.anular');
     });
 
     Route::middleware('seccion:liquidaciones')->group(function () {

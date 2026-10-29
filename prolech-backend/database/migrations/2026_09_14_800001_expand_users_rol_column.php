@@ -21,7 +21,11 @@ return new class extends Migration
         if ($driver === 'mysql') {
             DB::statement("ALTER TABLE `users` MODIFY `rol` VARCHAR(30) NOT NULL DEFAULT 'chofer'");
         } elseif ($driver === 'sqlite') {
-            // SQLite no soporta MODIFY; en dev local el rol ya suele ser string flexible.
+            // SQLite no tiene MODIFY: Laravel reconstruye la tabla y se va el CHECK del enum
+            // (antes un "migrate:fresh --seed" en SQLite fallaba al crear el usuario de calidad).
+            Schema::table('users', function (\Illuminate\Database\Schema\Blueprint $table) {
+                $table->string('rol', 30)->default('chofer')->change();
+            });
         }
     }
 

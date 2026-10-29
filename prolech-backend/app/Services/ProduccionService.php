@@ -29,6 +29,40 @@ class ProduccionService
      *
      * @throws \RuntimeException  Si algún insumo no tiene stock suficiente (provoca rollback).
      */
+    /**
+     * Orden de producción con VARIOS productos: crea un lote por producto, todos con el
+     * mismo código ORD-AAAAMMDD-NNN. Es todo o nada: si los insumos compartidos (p. ej. la
+     * leche cruda) no alcanzan para la suma de las líneas, no se registra ninguna.
+     *
+     * @param  array<int, array{receta_id:int, cantidad:int}>  $lineas
+     * @return \Illuminate\Support\Collection<int, ProduccionLote>
+     */
+    public function registrarOrden(array $lineas, User $responsable, ?string $observaciones = null): \Illuminate\Support\Collection
+    {
+        // Misma receta dos veces → se suma en una sola línea
+        $porReceta = [];
+        foreach ($lineas as $l) {
+            $porReceta[(int) $l['receta_id']] = ($porReceta[(int) $l['receta_id']] ?? 0) + (int) $l['cantidad'];
+        }
+        if ($porReceta === []) {
+            throw new \RuntimeException('Agrega al menos un producto a la orden.');
+        }
+
+        return DB::transaction(function () use ($porReceta, $responsable, $observaciones) {
+            $orden = count($porReceta) > 1 ? ProduccionLote::generarCodigoOrden() : null;
+            $lotes = collect();
+            foreach ($porReceta as $recetaId => $cantidad) {
+                // Cada lote descuenta su stock; el siguiente ya ve el stock reducido
+                $lote = $this->registrarLote($recetaId, $cantidad, $responsable, $observaciones);
+                if ($orden) {
+                    $lote->update(['orden_codigo' => $orden]);
+                }
+                $lotes->push($lote);
+            }
+            return $lotes;
+        });
+    }
+
     public function registrarLote(
         int    $recetaId,
         int    $cantidadProducida,

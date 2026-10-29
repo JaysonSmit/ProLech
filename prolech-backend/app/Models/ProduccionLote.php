@@ -13,6 +13,7 @@ class ProduccionLote extends Model
 
     protected $fillable = [
         'codigo_lote',
+        'orden_codigo',
         'receta_id',
         'fecha_produccion',
         'cantidad_producida',
@@ -63,7 +64,16 @@ class ProduccionLote extends Model
      * Genera el siguiente código de lote del día.
      * Formato: PRD-YYYYMMDD-NNN (NNN = correlativo diario con cero-relleno)
      */
-    public static function generarCodigo(\DateTimeInterface|string $fecha = null): string
+    /** ORD-AAAAMMDD-NNN: agrupa los lotes registrados juntos en una orden. */
+    public static function generarCodigoOrden(): string
+    {
+        $prefijo = 'ORD-' . now()->format('Ymd') . '-';
+        $ultimo = static::where('orden_codigo', 'like', $prefijo . '%')->orderByDesc('orden_codigo')->value('orden_codigo');
+        $n = $ultimo ? ((int) substr($ultimo, -3)) + 1 : 1;
+        return $prefijo . str_pad((string) $n, 3, '0', STR_PAD_LEFT);
+    }
+
+    public static function generarCodigo(\DateTimeInterface|string|null $fecha = null): string
     {
         $fecha = $fecha
             ? \Carbon\Carbon::parse($fecha)

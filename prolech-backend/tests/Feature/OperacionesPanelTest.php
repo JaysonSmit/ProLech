@@ -114,6 +114,38 @@ class OperacionesPanelTest extends TestCase
         $this->comoAdmin()->get('/admin/exportar')->assertOk()->assertSee('Liquidaciones');
     }
 
+    public function test_exportar_en_excel_xlsx(): void
+    {
+        $r = $this->comoAdmin()->get('/admin/exportar/acopios.csv?formato=xlsx')->assertOk()
+                  ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $xlsx = $r->getContent();
+
+        $this->assertStringStartsWith("PK\x03\x04", $xlsx, 'es un ZIP');
+        $this->assertStringContainsString('xl/worksheets/sheet1.xml', $xlsx);
+        // Entradas sin comprimir: el XML de la hoja se lee tal cual
+        $this->assertStringContainsString('<t xml:space="preserve">Juan Pérez</t>', $xlsx);
+        $this->assertStringContainsString('<v>12.5</v>', $xlsx, 'litros como número, no texto');
+        $this->assertStringContainsString('state="frozen"', $xlsx);
+
+        // El CRC de cada entrada coincide con su contenido (Excel rechaza ZIPs corruptos)
+        preg_match_all('/PK\x03\x04.{10}(.{4})(.{4}).{4}(..)(..)/s', $xlsx, $m, PREG_OFFSET_CAPTURE);
+        foreach ($m[0] as $i => [$cab, $pos]) {
+            $crc = unpack('V', $m[1][$i][0])[1];
+            $tam = unpack('V', $m[2][$i][0])[1];
+            $largoNombre = unpack('v', $m[3][$i][0])[1];
+            $this->assertSame($crc, crc32(substr($xlsx, $pos + 30 + $largoNombre, $tam)));
+        }
+        $this->assertCount(6, $m[0]);
+    }
+
+    public function test_exportar_en_pdf(): void
+    {
+        foreach (['/admin/exportar/acopios.csv', '/admin/exportar/liquidaciones.csv', '/admin/exportar/rutas.csv'] as $url) {
+            $r = $this->comoAdmin()->get("$url?formato=pdf")->assertOk()->assertHeader('Content-Type', 'application/pdf');
+            $this->assertStringStartsWith('%PDF-', $r->getContent(), $url);
+        }
+    }
+
     public function test_un_chofer_no_entra_al_panel(): void
     {
         $this->actingAs($this->chofer)->withSession(['2fa_verified' => true])->get('/admin/en-vivo')->assertForbidden();
