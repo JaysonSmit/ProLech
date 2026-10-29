@@ -94,6 +94,21 @@ class OperacionesPanelTest extends TestCase
         $this->comoAdmin()->get('/admin/zonas/mapa')->assertOk()->assertSee('12345678')->assertSee('Collana 2');
     }
 
+    public function test_mover_un_ganadero_con_ruta_no_le_cambia_la_ruta_y_uno_sin_ruta_toma_la_zona(): void
+    {
+        $poligono = [[-15.70, -70.05], [-15.70, -69.95], [-15.80, -69.95], [-15.80, -70.05]];
+        $conPoligono = Zona::create(['codigo' => 'C3', 'nombre' => 'Collana 3', 'orden' => 3, 'activa' => true, 'poligono' => $poligono]);
+        $sinPoligono = Zona::create(['codigo' => 'HUATA1', 'nombre' => 'HUATA1', 'orden' => 5, 'activa' => true]);
+        $this->ganadero->update(['zona_id' => $sinPoligono->id]);
+        $sinRuta = \App\Models\Ganadero::create(['dni' => '99999999', 'nombre' => 'Nuevo', 'activo' => true]);
+
+        $this->comoAdmin()->postJson("/admin/zonas/mapa/{$this->ganadero->id}", ['geo_lat' => -15.75, 'geo_lon' => -70.0])->assertOk();
+        $this->comoAdmin()->postJson("/admin/zonas/mapa/{$sinRuta->id}", ['geo_lat' => -15.75, 'geo_lon' => -70.0])->assertOk();
+
+        $this->assertSame($sinPoligono->id, $this->ganadero->fresh()->zona_id);
+        $this->assertSame($conPoligono->id, $sinRuta->fresh()->zona_id);
+    }
+
     public function test_exportar_acopios_genera_csv_para_excel(): void
     {
         $r = $this->comoAdmin()->get('/admin/exportar/acopios.csv')->assertOk();

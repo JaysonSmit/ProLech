@@ -31,7 +31,7 @@ class Check2FA
         }
 
         // Solo aplica a roles obligatorios
-        if (! in_array($user->rol, self::ROLES_OBLIGATORIOS, true)) {
+        if (! $user->tieneRol(...self::ROLES_OBLIGATORIOS)) {
             return $next($request);
         }
 

@@ -22,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Fechas en español en todo el sistema («jueves, 29 de octubre de 2026»)
+        \Carbon\Carbon::setLocale('es');
+        // Paginación del panel con «Mostrando 1 a 15 de N resultados»
+        \Illuminate\Pagination\Paginator::defaultView('vendor.pagination.prolech');
+
         // Login: máximo 5 intentos por minuto por correo + IP (frena ataques de fuerza bruta)
         // y 30 por IP para que no se puedan probar muchos correos distintos.
         $porCorreo = fn (Request $r) => strtolower((string) $r->input('email')) . '|' . $r->ip();

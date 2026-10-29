@@ -105,17 +105,15 @@
                         <td>
                             <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                 {{-- Cambio rápido a Enviado --}}
-                                @if($pedido->estado_pedido !== 'Enviado' && $pedido->estado_pedido !== 'Cancelado')
+                                @if($sig = $pedido->siguienteEstado())
                                 <form method="POST"
                                       action="{{ route('admin.tienda.pedidos.estado', $pedido) }}">
                                     @csrf
-                                    <input type="hidden" name="estado_pedido"
-                                           value="{{ $pedido->estado_pedido === 'Pendiente' ? 'Pagado' : 'Enviado' }}">
+                                    <input type="hidden" name="estado_pedido" value="{{ $sig }}">
                                     <button type="submit"
                                         style="padding:4px 10px; border:none; cursor:pointer; border-radius:6px; font-size:.76rem; font-weight:600;
-                                               background:{{ $pedido->estado_pedido === 'Pendiente' ? 'var(--blue-bg)' : 'var(--green-bg)' }};
-                                               color:{{ $pedido->estado_pedido === 'Pendiente' ? 'var(--blue)' : 'var(--green)' }};">
-                                        {{ $pedido->estado_pedido === 'Pendiente' ? '💳 Pagado' : '🚚 Enviado' }}
+                                               background:var(--blue-bg); color:var(--blue);">
+                                        {{ \App\Models\PedidoWeb::ACCION_SIGUIENTE[$sig] }}
                                     </button>
                                 </form>
                                 @endif

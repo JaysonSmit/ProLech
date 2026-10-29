@@ -13,7 +13,7 @@ class CheckRol
      */
     public function handle(Request $request, Closure $next, string ...$roles): Response
     {
-        if (! $request->user() || ! in_array($request->user()->rol, $roles)) {
+        if (! $request->user() || ! $request->user()->tieneRol(...$roles)) {   // principal o acceso adicional
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'No tienes permisos para esta acción.'], 403);
             }

@@ -47,6 +47,16 @@
         --purple:       #7c3aed;
         --purple-bg:    #ede9fe;
 
+        /* Nombres de la paleta anterior: aún los usan algunas vistas (solicitudes de ruta, reportes…) */
+        --blanco:       #ffffff;
+        --azul:         var(--blue);
+        --verde:        var(--green);
+        --rojo:         var(--red);
+        --naranja:      var(--amber);
+        --texto:        var(--text);
+        --texto-suave:  var(--text-muted);
+        --gris-borde:   var(--border);
+
         /* Layout */
         --sidebar-w:    256px;
         --header-h:     64px;
@@ -644,7 +654,9 @@
     nav[aria-label] { margin-top: 14px; }
 
     /* Entrada suave del contenido */
-    .content > * { animation: fadeUp .35s ease both; }
+    /* "backwards": al terminar, cada elemento vuelve a su propia opacidad. Con "both" la animación
+       dejaba opacity:1 fija y un modal oculto con opacity:0 (Solicitudes de ruta) quedaba visible. */
+    .content > :not(.modal-overlay) { animation: fadeUp .35s ease backwards; }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
     /* Responsive */
@@ -664,6 +676,7 @@
     </style>
 </head>
 <body>
+@include('partials.pantalla-carga')
 
 {{-- ── Sidebar ──────────────────────────────────────────────────────────── --}}
 <aside class="sidebar">
@@ -686,6 +699,11 @@
             <span class="nav-icon">⊞</span>
             <span>Dashboard</span>
         </a>
+        <a href="{{ route('admin.acopios') }}"
+           class="nav-link {{ request()->routeIs('admin.acopios') ? 'active' : '' }}">
+            <span class="nav-icon">🥛</span>
+            <span>Entregas de leche</span>
+        </a>
         @endif
 
         @if($webUser->seccionWebPermitida('produccion') || $webUser->seccionWebPermitida('ventas') || $webUser->seccionWebPermitida('liquidaciones'))
@@ -703,6 +721,12 @@
            style="padding-left:28px;font-size:.82rem">
             <span class="nav-icon" style="font-size:.85rem">📋</span>
             <span>Recetas</span>
+        </a>
+        <a href="{{ route('admin.kardex.insumos') }}"
+           class="nav-link {{ request()->routeIs('admin.kardex*') ? 'active' : '' }}"
+           style="padding-left:28px;font-size:.82rem">
+            <span class="nav-icon" style="font-size:.85rem">📒</span>
+            <span>Kárdex valorizado</span>
         </a>
         <a href="{{ route('admin.inventario.index') }}"
            class="nav-link {{ request()->routeIs('admin.inventario*') ? 'active' : '' }}"
@@ -772,6 +796,11 @@
             <span class="nav-icon">🗺️</span>
             <span>Mapa GPS</span>
         </a>
+        <a href="{{ route('admin.planilla.index') }}"
+           class="nav-link {{ request()->routeIs('admin.planilla*') ? 'active' : '' }}">
+            <span class="nav-icon">💼</span>
+            <span>Planilla choferes</span>
+        </a>
         <a href="{{ route('admin.operaciones.recorrido') }}"
            class="nav-link {{ request()->routeIs('admin.operaciones.recorrido*') ? 'active' : '' }}">
             <span class="nav-icon">🛰️</span>
@@ -781,6 +810,11 @@
            class="nav-link {{ request()->routeIs('admin.operaciones.zonas*') ? 'active' : '' }}">
             <span class="nav-icon">🧭</span>
             <span>Zonas en el mapa</span>
+        </a>
+        <a href="{{ route('admin.operaciones.trazar') }}"
+           class="nav-link {{ request()->routeIs('admin.operaciones.trazar*') ? 'active' : '' }}">
+            <span class="nav-icon">🗺️</span>
+            <span>Rutas y choferes</span>
         </a>
         <a href="{{ route('admin.operaciones.exportar') }}"
            class="nav-link {{ request()->routeIs('admin.operaciones.exportar*') ? 'active' : '' }}">
@@ -886,6 +920,11 @@
 
         @if($webUser->seccionWebPermitida('calidad_plan') && Route::has('admin.calidad.plan.index'))
         <div class="nav-section" style="margin-top:8px">Calidad</div>
+        <a href="{{ route('admin.calidad.control.index') }}"
+           class="nav-link {{ request()->routeIs('admin.calidad.control*') ? 'active' : '' }}">
+            <span class="nav-icon">🧪</span>
+            <span>Control sorpresa</span>
+        </a>
         <a href="{{ route('admin.calidad.plan.index') }}"
            class="nav-link {{ request()->routeIs('admin.calidad.plan*') ? 'active' : '' }}"
            style="border-left:3px solid #ffc107">
@@ -936,7 +975,7 @@
     <div class="topbar">
         <div class="topbar-title">
             <h2>@yield('page-title', 'Panel Administrador')</h2>
-            <p>{{ now()->isoFormat('dddd, D [de] MMMM YYYY') }}</p>
+            <p>{{ now()->locale('es')->isoFormat('dddd, D [de] MMMM [de] YYYY') }}</p>
         </div>
         <div class="topbar-actions">
             <div class="topbar-pill">
@@ -964,5 +1003,7 @@
     </div>
 </main>
 
+{{-- Scripts y estilos que agregan las vistas con @push('scripts') (p. ej. el modal de publicar receta) --}}
+@stack('scripts')
 </body>
 </html>

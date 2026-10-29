@@ -112,6 +112,10 @@
 </div>
 @endif
 
+@if(auth()->user()->isAdmin())
+<div style="margin-bottom:22px">@include('admin.costos._costo_leche')</div>
+
+@endif
 {{-- ── Tabla adulteraciones del día ────────────────────────────────────────── --}}
 <div class="card">
     <div class="card-header">
@@ -197,30 +201,58 @@
                         <th>Ganadero</th>
                         <th>Chofer</th>
                         <th>Litros</th>
-                        <th>Balde</th>
-                        <th>LactoScan</th>
-                        <th>% Agua</th>
-                        <th>pH</th>
+                        <th>Observación del chofer</th>
+                        <th>Calidad (Lactoscan planta)</th>
+                        <th>Muestra</th>
                         <th>Estado</th>
                     </tr>
                 </thead>
                 <tbody>
+                    @php
+                        $obsTxt = \App\Services\ControlCalidadService::OBSERVACIONES;
+                        $semColor = ['verde' => ['#dcfce7', '#15803d'], 'amarillo' => ['#fef3c7', '#92400e'], 'rojo' => ['#fee2e2', '#b91c1c']];
+                    @endphp
                     @foreach($acopiosRecientes as $a)
+                    @php
+                        $r = $riesgos[$a->ganadero_id] ?? null;
+                        // La app ya no mide: sin lectura de planta el acopio queda «sin medir»
+                        $sinMedir = (float) $a->porcentaje_agua == 0.0 && ! $a->densidad && ! $a->acidez_ph;
+                    @endphp
                     <tr>
                         <td style="white-space:nowrap">{{ $a->fecha->format('d/m/Y') }}</td>
-                        <td>{{ $a->ganadero->nombre ?? '—' }}</td>
-                        <td>{{ $a->chofer->name ?? '—' }}</td>
-                        <td>{{ number_format($a->litros, 1) }}</td>
                         <td>
-                            @if($a->medicion_balde_confirmada ?? true)
-                                <span style="color:var(--green)">✓</span>
-                            @else
-                                <span style="color:var(--amber);font-weight:700">⚠</span>
+                            {{ $a->ganadero->nombre ?? '—' }}
+                            @if($r)
+                                <a href="{{ route('admin.calidad.control.index') }}#semaforo" title="{{ implode(' · ', $r['motivos']) ?: 'Sin señales' }}"
+                                   style="display:inline-block;margin-left:4px;font-size:.66rem;font-weight:700;padding:1px 7px;border-radius:9px;text-decoration:none;background:{{ $semColor[$r['nivel']][0] }};color:{{ $semColor[$r['nivel']][1] }}">● {{ $r['puntaje'] }}</a>
                             @endif
                         </td>
-                        <td>{{ $a->equipo_lactoscan ? '🔬 '.$a->equipo_lactoscan : '—' }}</td>
-                        <td>{{ $a->porcentaje_agua !== null ? number_format($a->porcentaje_agua, 2).'%' : '—' }}</td>
-                        <td>{{ $a->acidez_ph !== null ? number_format($a->acidez_ph, 2) : '—' }}</td>
+                        <td style="white-space:nowrap">{{ $a->chofer->name ?? '—' }}<br>
+                            <small style="color:var(--text-muted)">{{ $a->acopio_campo_id ? '📱 App de campo' : '🏭 Registro en planta' }}</small></td>
+                        <td><strong>{{ number_format($a->litros, 1) }}</strong></td>
+                        <td style="font-size:.8rem">
+                            @if($a->observacion && $a->observacion !== 'normal')
+                                <span style="color:#b45309;font-weight:600">{{ $obsTxt[$a->observacion] ?? $a->observacion }}</span>
+                                @if($a->observacion_nota)<br><small style="color:var(--text-muted)">{{ $a->observacion_nota }}</small>@endif
+                            @elseif($a->observacion === 'normal')
+                                <span style="color:var(--green)">✓ Normal</span>
+                            @else <span style="color:var(--text-muted)">—</span> @endif
+                        </td>
+                        <td style="font-size:.8rem;white-space:nowrap">
+                            @if($sinMedir)
+                                <span style="color:var(--text-muted)">Sin medir</span>
+                            @else
+                                💧 {{ number_format($a->porcentaje_agua, 1) }} % agua
+                                @if($a->acidez_ph)<br><small style="color:var(--text-muted)">pH {{ number_format($a->acidez_ph, 2) }}@if($a->densidad) · dens. {{ number_format($a->densidad, 3) }}@endif</small>@endif
+                            @endif
+                        </td>
+                        <td style="font-size:.78rem">
+                            @if($a->muestra_codigo)
+                                🧪 {{ $a->muestra_codigo }}
+                                @if($a->control_resultado)<br><span style="font-weight:700;color:{{ $a->control_resultado === 'grave' ? '#b91c1c' : ($a->control_resultado === 'leve' ? '#b45309' : '#15803d') }}">{{ ucfirst($a->control_resultado) }}</span>
+                                @else<br><small style="color:var(--text-muted)">en análisis</small>@endif
+                            @else <span style="color:var(--text-muted)">—</span> @endif
+                        </td>
                         <td><span class="badge badge-{{ $a->estado }}">{{ ucfirst($a->estado) }}</span></td>
                     </tr>
                     @endforeach

@@ -23,6 +23,9 @@ class PedidoWeb extends Model
         'metodo_pago',
         'pago_referencia',
         'estado_pedido',
+        'despachado_at',
+        'entregado_at',
+        'notas_despacho',
         'comprobante_yape_url',
         'notas',
         'sunat_estado',
@@ -31,6 +34,8 @@ class PedidoWeb extends Model
     ];
 
     protected $casts = [
+        'despachado_at' => 'datetime',
+        'entregado_at'  => 'datetime',
         'total' => 'decimal:2',
     ];
 
@@ -75,7 +80,8 @@ class PedidoWeb extends Model
         return match ($this->estado_pedido) {
             'Pendiente'  => ['label' => 'Pendiente',  'color' => '#92400e', 'bg' => '#fef3c7'],
             'Pagado'     => ['label' => 'Pagado',     'color' => '#1d4ed8', 'bg' => '#dbeafe'],
-            'Enviado'    => ['label' => 'Enviado',    'color' => '#166534', 'bg' => '#dcfce7'],
+            'Enviado'    => ['label' => 'En camino',  'color' => '#7c2d12', 'bg' => '#ffedd5'],
+            'Entregado'  => ['label' => 'Entregado',  'color' => '#166534', 'bg' => '#dcfce7'],
             'Cancelado'  => ['label' => 'Cancelado',  'color' => '#991b1b', 'bg' => '#fee2e2'],
             default      => ['label' => $this->estado_pedido, 'color' => '#64748b', 'bg' => '#f1f5f9'],
         };
@@ -171,6 +177,7 @@ class PedidoWeb extends Model
         return match ($this->estado_pedido) {
             'Pagado'    => "Hola {$nombre} 👋 Confirmamos el pago de tu pedido {$this->codigo_pedido} (S/ " . number_format((float) $this->total, 2) . "). Lo estamos preparando 🧀",
             'Enviado'   => "Hola {$nombre} 🚚 Tu pedido {$this->codigo_pedido} ya va en camino. ¡Gracias por elegir ProLech!",
+            'Entregado' => "Hola {$nombre} 🏠 Tu pedido {$this->codigo_pedido} fue entregado. ¡Que lo disfrutes! Gracias por comprar en ProLech.",
             'Cancelado' => "Hola {$nombre}. Tu pedido {$this->codigo_pedido} fue cancelado. Si tienes dudas, responde este mensaje.",
             default     => "Hola {$nombre} 🥛 Recibimos tu pedido {$this->codigo_pedido} por S/ " . number_format((float) $this->total, 2) . ". Síguelo aquí: {$seguimiento}",
         };
@@ -183,6 +190,16 @@ class PedidoWeb extends Model
             ProductoTienda::where('id', $d->producto_tienda_id)
                 ->{$signo > 0 ? 'increment' : 'decrement'}('stock_disponible', $d->cantidad);
         }
+    }
+
+    /** Estados en el orden del despacho y el siguiente paso de cada uno. */
+    public const FLUJO = ['Pendiente' => 'Pagado', 'Pagado' => 'Enviado', 'Enviado' => 'Entregado'];
+
+    public const ACCION_SIGUIENTE = ['Pagado' => '💳 Confirmar pago', 'Enviado' => '🚚 Despachar', 'Entregado' => '🏠 Marcar entregado'];
+
+    public function siguienteEstado(): ?string
+    {
+        return self::FLUJO[$this->estado_pedido] ?? null;
     }
 
     /**

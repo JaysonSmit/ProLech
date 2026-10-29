@@ -45,7 +45,7 @@ class AdulteracionService
 
         $strikesEnSemana = Acopio::where('ganadero_id', $ganadero->id)
                                  ->whereIn('estado', ['rechazado', 'observado'])
-                                 ->whereBetween('fecha', [$inicioCiclo, $finCiclo])
+                                 ->whereDate('fecha', '>=', $inicioCiclo)->whereDate('fecha', '<=', $finCiclo)
                                  ->count();
 
         if ($strikesEnSemana >= 2) {
@@ -84,7 +84,7 @@ class AdulteracionService
     {
         try {
             // Administrador activo (user id 1 por convención si no hay)
-            $adminId = User::where('rol', 'admin')->where('activo', true)->value('id') ?? 1;
+            $adminId = User::conRol('admin')->where('activo', true)->orderBy('id')->value('id') ?? 1;
 
             Notificacion::enviar(
                 userId:       $adminId,

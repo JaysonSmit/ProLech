@@ -177,10 +177,7 @@ class LiquidacionController extends Controller
 
         $acopios = Acopio::with('chofer:id,name')
             ->where('ganadero_id', $liquidacion->ganadero_id)
-            ->whereBetween('fecha', [
-                $liquidacion->semana_inicio->toDateString(),
-                $liquidacion->semana_fin->toDateString(),
-            ])
+            ->whereDate('fecha', '>=', $liquidacion->semana_inicio)->whereDate('fecha', '<=', $liquidacion->semana_fin)
             ->orderBy('fecha')
             ->get();
 
@@ -199,10 +196,7 @@ class LiquidacionController extends Controller
         $liquidacion->load('ganadero');
 
         $dias = Acopio::where('ganadero_id', $liquidacion->ganadero_id)
-            ->whereBetween('fecha', [
-                $liquidacion->semana_inicio->toDateString(),
-                $liquidacion->semana_fin->toDateString(),
-            ])
+            ->whereDate('fecha', '>=', $liquidacion->semana_inicio)->whereDate('fecha', '<=', $liquidacion->semana_fin)
             ->selectRaw('fecha, SUM(litros) as litros_dia')
             ->groupBy('fecha')
             ->orderBy('fecha')
@@ -339,13 +333,18 @@ class LiquidacionController extends Controller
         Carbon   $fechaPago,
         int      $generadaPor
     ): ?Liquidacion {
+        // whereDate: con SQLite la fecha se guarda con hora y whereBetween dejaba fuera el último día
         $acopios = Acopio::where('ganadero_id', $ganadero->id)
-                         ->whereBetween('fecha', [$semanaInicio->toDateString(), $semanaFin->toDateString()])
+                         ->whereDate('fecha', '>=', $semanaInicio)->whereDate('fecha', '<=', $semanaFin)
                          ->get();
 
         if ($acopios->isEmpty()) {
             return null;
         }
+
+        // Entregas con muestra sorpresa grave: esa leche no se paga
+        $noPagadas = $acopios->where('control_resultado', 'grave');
+        $acopios   = $acopios->where('control_resultado', '!=', 'grave')->values();
 
         // ── Precios desde configuración ───────────────────────────────────────
         $precioLitro     = Configuracion::precioLitroActual();
@@ -408,7 +407,11 @@ class LiquidacionController extends Controller
             }
         }
 
-        $numAdulteraciones = $acopios->whereIn('estado', ['rechazado', 'observado'])->count();
+        if ($noPagadas->isNotEmpty()) {
+            $litrosAdulterados += (float) $noPagadas->sum('litros');
+            $detalle[] = 'Muestra sorpresa adulterada: ' . $noPagadas->sum('litros') . ' L no se pagan';
+        }
+        $numAdulteraciones = $acopios->whereIn('estado', ['rechazado', 'observado'])->count() + $noPagadas->count();
         $totalBruto        = $subtotalNormal + $subtotalPenalidad;
         $totalNeto         = max(0, $totalBruto);
 

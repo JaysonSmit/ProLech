@@ -31,7 +31,7 @@ class MapaGpsController extends Controller
                 $t->ultima_actualizacion >= now()->subMinutes(30) && $t->estado_ruta === 'en_camino'
             ));
 
-        $totalChoferes = User::where('rol', 'chofer')->where('activo', true)->count();
+        $totalChoferes = User::conRol('chofer')->where('activo', true)->count();
 
         $sinSenial = TrackingGps::with('chofer:id,name')
             ->where('ultima_actualizacion', '<', now()->subMinutes(30))
@@ -49,6 +49,16 @@ class MapaGpsController extends Controller
             'choforesJson'     => $todosConTracking->toJson(),   // todos para el mapa
             'totalChoferes'    => $totalChoferes,
             'sinSenial'        => $sinSenial,
+            // Camino trazado de cada ruta y su chofer del mes, para comparar con la posición real
+            'rutas'            => \App\Models\Zona::where('activa', true)->orderBy('orden')->get()
+                ->filter(fn ($z) => $z->tieneTrazado())
+                ->map(fn ($z) => [
+                    'nombre'  => $z->nombre,
+                    'color'   => $z->color ?: '#1f6feb',
+                    'km'      => $z->trazado_km,
+                    'trazado' => $z->trazado,
+                    'chofer'  => \App\Models\User::find(\App\Models\AsignacionZona::choferDeZona($z->id))?->name,
+                ])->values(),
         ]);
     }
 
@@ -87,10 +97,7 @@ class MapaGpsController extends Controller
             'minutos_desde'        => (int) $t->ultima_actualizacion->diffInMinutes(now()),
             // Trazo real recorrido hoy (puntos que envía la app)
             'recorrido'            => \App\Models\TrackingGpsPunto::recorridoDeHoy($t->chofer_id),
-            'zona'                 => \App\Models\AsignacionZona::with('zona:id,nombre')
-                                        ->where('chofer_id', $t->chofer_id)
-                                        ->where('mes', now()->month)->where('anio', now()->year)
-                                        ->first()?->zona?->nombre,
+            'zona'                 => \App\Models\AsignacionZona::rutaDelMes($t->chofer_id),
         ];
     }
 }

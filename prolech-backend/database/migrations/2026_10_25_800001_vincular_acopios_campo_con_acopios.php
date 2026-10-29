@@ -29,8 +29,13 @@ return new class extends Migration
     {
         DB::table('acopios')->whereNotNull('acopio_campo_id')->delete();
 
+        // Primero la llave foránea y el índice único; SQLite no borra una columna que aún está indexada
         Schema::table('acopios', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('acopio_campo_id');
+            $table->dropForeign(['acopio_campo_id']);
+            $table->dropUnique(['acopio_campo_id']);
+        });
+        Schema::table('acopios', function (Blueprint $table) {
+            $table->dropColumn('acopio_campo_id');
         });
     }
 };

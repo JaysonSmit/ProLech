@@ -24,6 +24,8 @@ class Ganadero extends Model
         'user_id',
         'activo',
         'estado',          // 'Activo' | 'Suspendido'
+        'entregas_bloqueadas',   // sanción de calidad: entregas que aún no puede hacer
+        'bloqueo_motivo',
     ];
 
     protected $casts = [

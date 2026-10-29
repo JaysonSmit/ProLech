@@ -74,6 +74,8 @@
     </div>
 </div>
 
+<div style="margin-bottom:22px">@include('admin.costos._costo_leche')</div>
+
 {{-- ── GRID DE RECETAS ──────────────────────────────────────────────────────── --}}
 @if($recetas->isEmpty())
 <div class="card">
@@ -146,6 +148,29 @@
                 </div>
             @endif
 
+            {{-- ── COSTO Y PRECIO ─────────────────────────────────────────── --}}
+            @php
+                $costo = $receta->costoUnitario();
+                $precioTienda = isset($preciosTienda[$receta->id]) ? (float) $preciosTienda[$receta->id] : null;
+                $margen = $precioTienda ? $receta->margenDe($precioTienda) : null;
+                $colorMargen = $margen === null ? 'var(--text-muted)' : ($margen < 10 ? '#dc2626' : ($margen < 20 ? '#d97706' : '#15803d'));
+            @endphp
+            <div style="margin-top:10px;padding:8px 10px;background:var(--bg);border-radius:8px;font-size:.76rem;display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;">
+                <span style="color:var(--text-muted)">Costo por unidad</span>
+                <strong style="text-align:right">S/ {{ number_format($costo, 2) }}</strong>
+                <span style="color:var(--text-muted)">Sugerido ({{ rtrim(rtrim(number_format($margenObjetivo, 1), '0'), '.') }} %)</span>
+                <strong style="text-align:right;color:var(--brand)">S/ {{ number_format($receta->precioSugerido(), 2) }}</strong>
+                @if($precioTienda !== null)
+                <span style="color:var(--text-muted)">En tienda · margen</span>
+                <strong style="text-align:right;color:{{ $colorMargen }}">S/ {{ number_format($precioTienda, 2) }} · {{ $margen }} %</strong>
+                @endif
+            </div>
+            @if($margen !== null && $margen < 10)
+            <div style="font-size:.72rem;color:#dc2626;margin-top:4px">
+                ⚠ {{ $margen < 0 ? 'Se vende por debajo del costo.' : 'Margen muy bajo.' }} Revisa el precio en «Editar precio».
+            </div>
+            @endif
+
             {{-- ── ACCIONES ────────────────────────────────────────────────── --}}
             <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-soft);gap:6px;flex-wrap:wrap;">
 
@@ -175,7 +200,7 @@
                         </a>
                     @elseif($receta->activa)
                         <button type="button"
-                            onclick="abrirModalPublicar({{ $receta->id }}, {{ json_encode($receta->nombre) }}, {{ json_encode($receta->descripcion ?? '') }})"
+                            onclick="abrirModalPublicar({{ $receta->id }}, {{ json_encode($receta->nombre) }}, {{ json_encode($receta->descripcion ?? '') }}, {{ $receta->costoUnitario() }}, {{ $receta->precioSugerido() }})"
                             style="padding:5px 12px;background:var(--brand);border:none;border-radius:6px;font-size:.76rem;font-weight:700;color:#fff;cursor:pointer;transition:background .15s;"
                             onmouseenter="this.style.background='var(--brand-mid)'"
                             onmouseleave="this.style.background='var(--brand)'">
@@ -249,8 +274,9 @@
                            onfocus="this.style.borderColor='var(--brand)'"
                            onblur="this.style.borderColor='var(--border)'">
                 </div>
+                <div id="modal-margen" style="font-size:.78rem;margin-top:6px;font-weight:600;"></div>
                 <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">
-                    Podrás cambiar el precio en cualquier momento desde la gestión de productos.
+                    El precio sugerido sale del costo de la receta + el margen objetivo. Puedes cambiarlo ahora o después.
                 </div>
             </div>
 
@@ -305,12 +331,26 @@
 </style>
 <script>
 // ── Abrir modal ──────────────────────────────────────────────────
-function abrirModalPublicar(id, nombre, descripcion) {
+let costoModal = 0;
+function pintarMargen() {
+    const precio = parseFloat(document.getElementById('modal-precio').value);
+    const el = document.getElementById('modal-margen');
+    if (!precio || !costoModal) { el.textContent = costoModal ? `Costo por unidad: S/ ${costoModal.toFixed(2)}` : ''; return; }
+    const margen = (precio - costoModal) / precio * 100;
+    el.style.color = margen < 10 ? '#dc2626' : (margen < 20 ? '#d97706' : '#15803d');
+    el.textContent = `Costo S/ ${costoModal.toFixed(2)} · ganancia S/ ${(precio - costoModal).toFixed(2)} por unidad · margen ${margen.toFixed(1)} %`
+        + (margen < 0 ? ' — ¡por debajo del costo!' : '');
+}
+document.addEventListener('input', e => { if (e.target.id === 'modal-precio') pintarMargen(); });
+
+function abrirModalPublicar(id, nombre, descripcion, costo = 0, sugerido = 0) {
     document.getElementById('modal-receta-id').value    = id;
     document.getElementById('modal-descripcion').value  = descripcion;
     document.getElementById('modal-nombre-receta').textContent  = nombre;
     document.getElementById('modal-preview-nombre').textContent = nombre;
-    document.getElementById('modal-precio').value = '';
+    costoModal = Number(costo) || 0;
+    document.getElementById('modal-precio').value = sugerido ? Number(sugerido).toFixed(2) : '';
+    pintarMargen();
 
     // Reset imagen
     resetImagen();

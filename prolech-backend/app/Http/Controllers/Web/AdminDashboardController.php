@@ -94,7 +94,11 @@ class AdminDashboardController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'acopiosRecientes', 'adulteracionesHoy', 'acopiosSinBalde'));
+        $calidad = app(\App\Services\ControlCalidadService::class);
+        $riesgos = $acopiosRecientes->pluck('ganadero')->filter()->unique('id')
+            ->mapWithKeys(fn ($g) => [$g->id => $calidad->riesgo($g)]);
+
+        return view('admin.dashboard', compact('stats', 'acopiosRecientes', 'adulteracionesHoy', 'acopiosSinBalde', 'riesgos'));
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -205,6 +209,11 @@ class AdminDashboardController extends Controller
         $despachosPendientes = Venta::vigentes()->where('estado_despacho', 'preparacion')->count();
         $despachosEnCamino   = Venta::vigentes()->where('estado_despacho', 'en_camino')->count();
         $despachosEntregados = Venta::vigentes()->where('estado_despacho', 'entregado')->count();
+        // Pedidos de la tienda web que aún no se entregan (para despacharlos desde aquí)
+        $pedidosWebActivos = \App\Models\PedidoWeb::with('detalles.producto:id,nombre')
+            ->whereIn('estado_pedido', ['Pendiente', 'Pagado', 'Enviado'])
+            ->orderByRaw("CASE estado_pedido WHEN 'Pagado' THEN 0 WHEN 'Pendiente' THEN 1 ELSE 2 END")
+            ->oldest()->get();
 
         $precios = [
             'mayorista' => Venta::precioParaTipo('mayorista'),
@@ -216,12 +225,13 @@ class AdminDashboardController extends Controller
         $alertaStockQuesos = Produccion::alertaStockMinimo();
 
         $catalogo = app(\App\Services\VentaService::class)->catalogo();
+        $dashboard = app(\App\Services\VentasDashboard::class)->datos();
 
         return view('admin.ventas', compact(
-            'ventas', 'catalogo', 'resumenMes', 'resumenDestino', 'precios',
+            'ventas', 'catalogo', 'resumenMes', 'resumenDestino', 'precios', 'dashboard',
             'stockActualQuesos', 'stockMinimoQuesos', 'alertaStockQuesos',
             'despachosPendientes', 'despachosEnCamino', 'despachosEntregados',
-            'destinoFiltro', 'despachoFiltro'
+            'destinoFiltro', 'despachoFiltro', 'pedidosWebActivos'
         ));
     }
 
@@ -277,7 +287,7 @@ class AdminDashboardController extends Controller
     /** Anula la venta y devuelve el stock. Solo administrador y jefe de producción. */
     public function anularVenta(Request $request, Venta $venta): RedirectResponse
     {
-        abort_unless(in_array($request->user()->rol, ['admin', 'jefe_produccion'], true), 403,
+        abort_unless($request->user()->tieneRol('admin', 'jefe_produccion'), 403,
             'Solo el administrador o el jefe de producción pueden anular ventas.');
 
         $validated = $request->validate([

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 class LoginOtp extends Model
 {
+    use MassPrunable;
+
     protected $table = 'login_otps';
 
     protected $fillable = [
@@ -38,6 +41,12 @@ class LoginOtp extends Model
             && $this->expires_at->isFuture();
     }
 
+    /** Limpieza diaria (model:prune): códigos vencidos hace más de un día. */
+    public function prunable()
+    {
+        return static::where('expires_at', '<', now()->subDay());
+    }
+
     /** Marcar como usado ahora */
     public function marcarUsado(): void
     {
@@ -48,7 +57,7 @@ class LoginOtp extends Model
      * Crear un nuevo OTP para un usuario.
      * Invalida todos los OTPs anteriores no usados del mismo usuario.
      */
-    public static function generarPara(User $user, string $ip = null): self
+    public static function generarPara(User $user, ?string $ip = null): self
     {
         // Invalidar OTPs anteriores (marcarlos como usados)
         static::where('user_id', $user->id)

@@ -35,7 +35,7 @@
             <div id="mapa-zonas"></div>
             <p style="color:var(--text-muted); font-size:.8rem; margin-top:8px">
                 Toca un ganadero para cambiar su zona. Arrastra el marcador (o usa "Ubicar en el mapa" y haz clic) para corregir su GPS;
-                si cae dentro de una zona, se le asigna automáticamente.
+                si cae dentro de una zona, se le asigna esa zona (los de rutas sin polígono, como las creadas en «Rutas y choferes», conservan su ruta).
                 la app del chofer usa estos datos para ordenar la ruta.
             </p>
         </div>
@@ -54,8 +54,9 @@
     const colorZona = id => { const i = ZONAS.findIndex(z => z.id === id); return i < 0 ? '#94a3b8' : (ZONAS[i].color || COLORES[i % COLORES.length]); };
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-    document.getElementById('leyenda').innerHTML = ZONAS.map(z => `<span><i class="punto" style="background:${colorZona(z.id)}"></i>${esc(z.nombre)}</span>`).join('')
-        + '<span><i class="punto" style="background:#94a3b8"></i>Sin zona</span>';
+    document.getElementById('leyenda').innerHTML = ZONAS.map(z => `<span><i class="punto" style="background:${colorZona(z.id)}"></i>${esc(z.nombre)}${z.trazado_km ? ` <small style="color:var(--text-muted)">· camino ${Number(z.trazado_km).toFixed(1)} km</small>` : ''}</span>`).join('')
+        + '<span><i class="punto" style="background:#94a3b8"></i>Sin zona</span>'
+        + `<span><a href="${@json(route('admin.operaciones.trazar'))}">✏️ Editar rutas y caminos</a></span>`;
 
     const mapa = L.map('mapa-zonas').setView(PLANTA, 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(mapa);
@@ -64,6 +65,17 @@
     ZONAS.filter(z => Array.isArray(z.poligono) && z.poligono.length > 2).forEach(z =>
         L.polygon(z.poligono, { color: colorZona(z.id), weight: 2, fillOpacity: .08, interactive: false })
             .addTo(mapa).bindTooltip(z.nombre, { permanent: true, direction: 'center', className: 'etq-zona' }));
+    // Camino trazado de cada ruta (en «Rutas y choferes»); las rutas sin polígono se rotulan sobre su camino
+    ZONAS.filter(z => Array.isArray(z.trazado) && z.trazado.length > 1).forEach(z => {
+        L.polyline(z.trazado, { color: '#fff', weight: 7, opacity: .9, interactive: false }).addTo(mapa);
+        L.polyline(z.trazado, { color: colorZona(z.id), weight: 4, opacity: .95 })
+            .addTo(mapa).bindTooltip(`${z.nombre} · ${Number(z.trazado_km).toFixed(1)} km`, { sticky: true });
+        if (!(Array.isArray(z.poligono) && z.poligono.length > 2)) {
+            const medio = z.trazado[Math.floor(z.trazado.length / 2)];
+            L.marker(medio, { opacity: 0, interactive: false }).addTo(mapa)
+                .bindTooltip(z.nombre, { permanent: true, direction: 'center', className: 'etq-zona' });
+        }
+    });
     const marcadores = {};
     let moviendo = null;
 
@@ -136,7 +148,8 @@
 
     GANADEROS.forEach(pintarMarcador);
     pintarLista();
-    const conGps = GANADEROS.filter(g => g.geo_lat !== null).map(g => [g.geo_lat, g.geo_lon]);
+    const conGps = GANADEROS.filter(g => g.geo_lat !== null).map(g => [g.geo_lat, g.geo_lon])
+        .concat(...ZONAS.filter(z => Array.isArray(z.trazado)).map(z => z.trazado));
     if (conGps.length) mapa.fitBounds(L.latLngBounds(conGps.concat([PLANTA])).pad(0.1));
 })();
 </script>

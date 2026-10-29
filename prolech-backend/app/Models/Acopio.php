@@ -35,6 +35,10 @@ class Acopio extends Model
         'foto_evidencia',
         'client_uuid',
         'acopio_campo_id',
+        'observacion',
+        'observacion_nota',
+        'muestra_codigo',
+        'control_resultado',
     ];
 
     protected $casts = [
@@ -126,7 +130,7 @@ class Acopio extends Model
         return $query
             ->where('ganadero_id', $ganaderoId)
             ->whereIn('estado', ['rechazado', 'observado'])
-            ->whereBetween('fecha', [$inicio, $fin]);
+            ->whereDate('fecha', '>=', $inicio)->whereDate('fecha', '<=', $fin);
     }
 
     /**

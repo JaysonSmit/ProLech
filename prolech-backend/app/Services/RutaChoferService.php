@@ -18,8 +18,9 @@ use Illuminate\Support\Collection;
  *   2. Zona asignada al chofer este mes (rotación mensual en "Rotación Zonas").
  *   3. Respaldo: ruta del último ganadero que acopió.
  *
- * El orden de las paradas se calcula con "vecino más cercano" partiendo de la
- * planta, que da un recorrido corto sin depender de servicios externos.
+ * Orden de las paradas: si el administrador trazó el camino de la zona en el mapa
+ * ("Trazar rutas"), se visitan en el sentido de ese trazado; si no, se usa el
+ * "vecino más cercano" partiendo de la planta, sin depender de servicios externos.
  */
 class RutaChoferService
 {
@@ -27,7 +28,7 @@ class RutaChoferService
     {
         $hoy = now();
 
-        $asignacion = AsignacionZona::with('zona')
+        $asignacion = AsignacionZona::with('zona', 'zonaExtra')
             ->where('chofer_id', $chofer->id)
             ->where('mes', $hoy->month)
             ->where('anio', $hoy->year)
@@ -37,15 +38,17 @@ class RutaChoferService
         $zona   = null;
         $nombre = null;
         $origen = null;
+        // Rutas que recorre hoy: la principal y, si hay más rutas que choferes, una segunda
+        $zonas  = collect([$asignacion?->zona, $asignacion?->zonaExtra])->filter()->values();
 
         if ($rutaManual) {
             $query->where('ruta_asignada', $rutaManual);
             $nombre = $rutaManual;
             $origen = 'manual';
-        } elseif ($asignacion?->zona) {
-            $zona   = $asignacion->zona;
-            $query->where('zona_id', $zona->id);
-            $nombre = $zona->nombre;
+        } elseif ($zonas->isNotEmpty()) {
+            $zona   = $zonas->first();
+            $query->whereIn('zona_id', $zonas->pluck('id'));
+            $nombre = $zonas->pluck('nombre')->join(' + ');
             $origen = 'zona';
         } else {
             // Sin zona este mes: ruta del último acopio, o la primera ruta con ganaderos activos
@@ -59,13 +62,26 @@ class RutaChoferService
         }
 
         $ganaderos = $query
-            ->select('id', 'dni', 'nombre', 'direccion', 'ruta_asignada', 'estado', 'geo_lat', 'geo_lon', 'zona_id')
+            ->select('id', 'dni', 'nombre', 'direccion', 'ruta_asignada', 'estado', 'geo_lat', 'geo_lon', 'zona_id', 'entregas_bloqueadas', 'bloqueo_motivo')
             ->orderBy('nombre')
             ->get();
 
         $atendidos = $this->atendidosHoy($chofer->id);
+        $muestras  = \App\Models\ControlCalidad::where('tipo', 'muestra')->where('estado', 'programado')
+            ->whereDate('fecha', $hoy)->whereIn('ganadero_id', $ganaderos->pluck('id'))->pluck('frasco_codigo', 'ganadero_id');
         $planta    = $this->planta();
-        $ordenados = $this->ordenarPorCercania($ganaderos, $planta);
+        if ($zonas->count() > 1 && ! $rutaManual) {
+            // Primero toda la ruta principal y luego la segunda, cada una en el orden de su camino
+            $ordenados = $zonas->flatMap(function ($z) use ($ganaderos, $planta) {
+                $deZona = $ganaderos->where('zona_id', $z->id)->values();
+                return $z->tieneTrazado() ? self::ordenarPorTrazado($deZona, $z) : $this->ordenarPorCercania($deZona, $planta);
+            });
+        } else {
+            $ordenados = $zona?->tieneTrazado()
+                ? self::ordenarPorTrazado($ganaderos, $zona)
+                : $this->ordenarPorCercania($ganaderos, $planta);
+        }
+        $nombreZona = $zonas->pluck('nombre', 'id');
 
         $paradas = $ordenados->values()->map(fn (Ganadero $g, int $i) => [
             'id'              => $g->id,
@@ -78,7 +94,17 @@ class RutaChoferService
             'geo_lon'         => $g->geo_lon !== null ? (float) $g->geo_lon : null,
             'atendido'        => $atendidos->contains($g->id),
             'suspendido'      => strcasecmp((string) $g->estado, 'Suspendido') === 0,
+            // Sanción de calidad: entregas que aún no puede hacer
+            'bloqueado'       => (int) $g->entregas_bloqueadas,
+            'bloqueo_motivo'  => $g->bloqueo_motivo,
+            // Control sorpresa: el chofer se entera recién al registrar la entrega
+            'muestra'         => $muestras[$g->id] ?? null,
+            // Ruta a la que pertenece la parada (útil cuando recorre dos)
+            'ruta'            => $nombreZona[$g->zona_id] ?? $nombre,
         ]);
+
+        $carga = $asignacion && $zonas->count() > 1 ? $asignacion->cargaEstimada() : null;
+        $trazados = $zonas->filter(fn ($z) => $z->tieneTrazado());
 
         return [
             'asignacion_id' => $asignacion?->id ?? 0,
@@ -94,6 +120,17 @@ class RutaChoferService
             'total'         => $paradas->count(),
             'atendidos'     => $paradas->where('atendido', true)->count(),
             'paradas'       => $paradas->all(),
+            // Camino trazado por el administrador ([[lat, lon], ...]); vacío = la app calcula uno
+            'trazado'       => $trazados->flatMap(fn ($z) => $z->trazado)->values()->all(),
+            'trazado_km'    => $trazados->isNotEmpty() ? round((float) $trazados->sum('trazado_km'), 2) : null,
+            'rutas'         => $zonas->map(fn ($z) => [
+                'id' => $z->id, 'codigo' => $z->codigo, 'nombre' => $z->nombre,
+                'paradas' => $paradas->where('ruta', $z->nombre)->count(),
+            ])->all(),
+            // Dos rutas que juntas superan la capacidad del camión: el chofer debe volver a la planta a descargar
+            'aviso_capacidad' => $carga && $carga['excede']
+                ? "Tus 2 rutas suelen dar ~" . number_format($carga['litros'], 0) . " L y el camión carga " . number_format($carga['capacidad'], 0) . " L: descarga en la planta antes de la segunda ruta."
+                : null,
             // Formato anterior: se mantiene para versiones antiguas de la app
             'ganaderos'     => $ganaderos,
         ];
@@ -129,6 +166,17 @@ class RutaChoferService
         $campo    = AcopioCampo::where('chofer_id', $choferId)->whereDate('created_at', $hoy)->pluck('ganadero_id');
 
         return $clasicos->merge($campo)->unique()->values();
+    }
+
+    /** En el sentido del trazado (km recorridos hasta cada predio); los que no tienen GPS van al final. */
+    public static function ordenarPorTrazado(Collection $ganaderos, \App\Models\Zona $zona): Collection
+    {
+        [$conGps, $sinGps] = $ganaderos->partition(fn ($g) => $g->geo_lat !== null && $g->geo_lon !== null);
+
+        return $conGps
+            ->sortBy(fn ($g) => $zona->posicionEnTrazado((float) $g->geo_lat, (float) $g->geo_lon)[0])
+            ->values()
+            ->merge($sinGps->values());
     }
 
     /** Vecino más cercano desde la planta; los que no tienen GPS van al final. */

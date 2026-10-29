@@ -58,6 +58,18 @@
                             <span class="error-msg">{{ $message }}</span>
                         @enderror
                     </div>
+
+                    {{-- Vida útil: con ella cada lote calcula su fecha de vencimiento --}}
+                    <div class="form-group" style="width:170px">
+                        <label for="dias_vida_util">
+                            Vida útil <span class="hint">— días</span>
+                        </label>
+                        <input type="number" id="dias_vida_util" name="dias_vida_util"
+                               min="1" max="3650" step="1"
+                               value="{{ old('dias_vida_util', $receta?->dias_vida_util ?? 15) }}"
+                               style="text-align:center;font-size:1.2rem;font-weight:700">
+                        @error('dias_vida_util')<span class="error-msg">{{ $message }}</span>@enderror
+                    </div>
                 </div>
 
                 {{-- Descripción --}}

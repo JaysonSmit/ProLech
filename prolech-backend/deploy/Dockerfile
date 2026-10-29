@@ -14,7 +14,8 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-interaction --prefer-dist --ignore-platform-reqs
 
 FROM php:8.5-fpm-alpine AS app
-RUN apk add --no-cache icu-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev \
+# mariadb-client trae mysqldump para los respaldos; connector-c, la autenticación de MySQL 8
+RUN apk add --no-cache icu-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev mariadb-client mariadb-connector-c \
  && docker-php-ext-configure gd --with-freetype --with-jpeg \
  && docker-php-ext-install pdo_mysql intl zip gd bcmath opcache
 COPY deploy/php.ini /usr/local/etc/php/conf.d/prolech.ini

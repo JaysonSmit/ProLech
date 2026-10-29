@@ -336,13 +336,23 @@
 
         document.getElementById('mapaLoader').classList.add('oculto');
 
+        // Camino que debe seguir cada ruta (trazado en «Rutas y choferes»)
+        var RUTAS = @json($rutas);
+        RUTAS.forEach(function (r) {
+            L.polyline(r.trazado, { color: '#fff', weight: 7, opacity: .8, interactive: false }).addTo(map);
+            L.polyline(r.trazado, { color: r.color, weight: 4, opacity: .85, dashArray: '10 8' })
+                .addTo(map)
+                .bindTooltip('🧭 ' + r.nombre + ' · ' + Number(r.km).toFixed(1) + ' km' + (r.chofer ? ' · ' + r.chofer : ''), { sticky: true });
+        });
+
         INICIAL.forEach(function (ch) { colocarMarcador(ch); });
 
         // Ajustar vista si hay marcadores
         var keys = Object.keys(marcadores);
-        if (keys.length > 0) {
-            var grupo = L.featureGroup(keys.map(function (k) { return marcadores[k]; }));
-            map.fitBounds(grupo.getBounds().pad(.2));
+        var puntosVista = keys.map(function (k) { return marcadores[k].getLatLng(); });
+        RUTAS.forEach(function (r) { puntosVista = puntosVista.concat(r.trazado); });
+        if (puntosVista.length > 0) {
+            map.fitBounds(L.latLngBounds(puntosVista).pad(.15));
         }
 
         // Polling cada 15 s

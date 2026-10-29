@@ -450,6 +450,7 @@
     </style>
 </head>
 <body>
+@include('partials.pantalla-carga')
 
     {{-- ── PANEL IZQUIERDO ── --}}
     <div class="hero">

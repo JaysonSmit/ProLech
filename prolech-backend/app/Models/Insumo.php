@@ -55,6 +55,18 @@ class Insumo extends Model
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
+    /**
+     * Costo que usan recetas y lotes: la «Leche Cruda» toma el costo real por litro puesto en
+     * planta (precio al ganadero + logística + gastos); los demás insumos, su costo de compra.
+     */
+    public function costoVigente(): float
+    {
+        if (\App\Services\CostoLecheService::esLecheCruda($this) && ($c = \App\Services\CostoLecheService::actual())) {
+            return round($c['costo_real'], 4);
+        }
+        return (float) $this->costo_unitario;
+    }
+
     /** Verifica si hay stock suficiente para una cantidad dada. */
     public function tieneStockSuficiente(float $cantidad): bool
     {

@@ -8,4 +8,6 @@ php artisan route:cache
 php artisan view:cache
 # Cola de trabajos en segundo plano
 su -s /bin/sh www-data -c "php artisan queue:work --sleep=3 --tries=3 --max-time=3600" &
+# Tareas programadas: respaldo diario, limpieza y avisos (routes/console.php)
+su -s /bin/sh www-data -c "php artisan schedule:work" &
 exec php-fpm
