@@ -54,6 +54,9 @@ actual fun platformModule(): Module = module {
     single<com.example.prolechc.data.dispositivo.LectorLactoscan> {
         com.example.prolechc.data.dispositivo.LectorLactoscanAndroid(androidContext())
     }
+    single<com.example.prolechc.data.dispositivo.AvisadorSistema> {
+        com.example.prolechc.data.dispositivo.AvisadorAndroid(androidContext())
+    }
     single<com.example.prolechc.data.dispositivo.AccionesTicket> {
         com.example.prolechc.data.dispositivo.AccionesTicketAndroid(androidContext())
     }

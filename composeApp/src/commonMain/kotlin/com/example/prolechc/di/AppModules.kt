@@ -204,6 +204,13 @@ val useCaseModule = module {
 
 val viewModelModule = module {
     viewModelOf(::AcopioListViewModel)
+    viewModel {
+        com.example.prolechc.presentation.avisos.AvisosViewModel(
+            repositorio = get(),
+            config      = get(),
+            avisador    = getOrNull()
+        )
+    }
     // Constructores con parámetros por defecto: se declaran explícitos para que Koin no los pida
     viewModel {
         AcopioViewModel(

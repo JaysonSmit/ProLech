@@ -11,7 +11,7 @@ class NotificacionRepositoryImpl(
 
     override suspend fun getNotificaciones(): Result<List<Notificacion>> =
         runCatching {
-            remoteDataSource.getNotificaciones()
+            remoteDataSource.getNotificaciones(todas = true)
                 .notificaciones
                 .orEmpty()
                 .map { it.toDomain() }

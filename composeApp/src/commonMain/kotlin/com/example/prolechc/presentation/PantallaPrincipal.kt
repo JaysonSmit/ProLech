@@ -22,6 +22,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.prolechc.domain.model.GanaderoCampo
 import com.example.prolechc.presentation.acopios.AcopioScreen
 import com.example.prolechc.presentation.acopios.AcopioViewModel
+import com.example.prolechc.presentation.avisos.AvisosViewModel
+import com.example.prolechc.presentation.avisos.DialogoAvisos
 import com.example.prolechc.presentation.ruta.MiRutaScreen
 import com.example.prolechc.data.local.ConfigLocal
 import com.example.prolechc.presentation.ruta.MiRutaViewModel
@@ -35,7 +37,7 @@ private enum class Pestana(val titulo: String, val icono: String) {
 
 /** Contenedor de la app con sesión iniciada: pestañas Mi ruta / Acopios. */
 @Composable
-fun PantallaPrincipal(onSesionCerrada: () -> Unit) {
+fun PantallaPrincipal(onSesionCerrada: () -> Unit, abrirAvisos: Boolean = false) {
     var pestana by rememberSaveable { mutableStateOf(Pestana.RUTA) }
     // Una sola instancia: desde la ruta se preselecciona el ganadero del formulario de acopio
     val acopioViewModel: AcopioViewModel = koinViewModel()
@@ -43,6 +45,21 @@ fun PantallaPrincipal(onSesionCerrada: () -> Unit) {
     val rutaViewModel: MiRutaViewModel = koinViewModel()
     val config: ConfigLocal = koinInject()
     var verCuenta by rememberSaveable { mutableStateOf(false) }
+    val avisosViewModel: AvisosViewModel = koinViewModel()
+    val avisos by avisosViewModel.estado.collectAsStateWithLifecycle()
+    var verAvisos by rememberSaveable { mutableStateOf(abrirAvisos) }
+    // Al tocar la notificación con la app ya abierta
+    androidx.compose.runtime.LaunchedEffect(abrirAvisos) { if (abrirAvisos) verAvisos = true }
+
+    if (verAvisos) {
+        DialogoAvisos(
+            estado       = avisos,
+            onLeer       = avisosViewModel::marcarLeido,
+            onLeerTodos  = avisosViewModel::marcarTodosLeidos,
+            onActualizar = avisosViewModel::refrescar,
+            onCerrar     = { verAvisos = false }
+        )
+    }
 
     if (verCuenta) {
         DialogoCuenta(
@@ -76,6 +93,19 @@ fun PantallaPrincipal(onSesionCerrada: () -> Unit) {
                         )
                     )
                 }
+                // Bandeja de avisos del administrador (reuniones, comunicados)
+                NavigationBarItem(
+                    selected = false,
+                    onClick = { verAvisos = true; avisosViewModel.refrescar() },
+                    icon = {
+                        if (avisos.noLeidas > 0) {
+                            BadgedBox(badge = { Badge { Text("${avisos.noLeidas}") } }) { Text("🔔", fontSize = 22.sp) }
+                        } else {
+                            Text("🔔", fontSize = 22.sp)
+                        }
+                    },
+                    label = { Text("Avisos") }
+                )
                 // No es una pestaña: abre el diálogo de la cuenta (servidor, sincronizar, cerrar sesión)
                 NavigationBarItem(
                     selected = false,
@@ -96,10 +126,12 @@ fun PantallaPrincipal(onSesionCerrada: () -> Unit) {
                                 id = parada.ganaderoId.toLong(),
                                 nombre = parada.ganaderoNombre,
                                 dni = parada.ganaderoNii,
-                                suspendido = parada.suspendido
+                                suspendido = parada.suspendido,
+                                bloqueado = parada.bloqueado,
+                                muestra = parada.muestra
                             )
                         )
-                        if (!parada.suspendido) pestana = Pestana.ACOPIO
+                        if (!parada.suspendido && parada.bloqueado == 0) pestana = Pestana.ACOPIO
                     }
                 )
                 Pestana.ACOPIO -> AcopioScreen(onSesionCerrada = onSesionCerrada, viewModel = acopioViewModel)

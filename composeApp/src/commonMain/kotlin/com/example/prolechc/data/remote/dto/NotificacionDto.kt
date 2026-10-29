@@ -15,7 +15,8 @@ data class NotificacionDto(
     @SerialName("titulo")        val titulo: String,
     @SerialName("mensaje")       val mensaje: String,
     @SerialName("tipo")          val tipo: String,
-    @SerialName("icono")         val icono: String,
+    @SerialName("icono")         val icono: String = "",
     @SerialName("referencia_id") val referenciaId: Int?  = null,
-    @SerialName("created_at")    val createdAt: String
+    @SerialName("leida")         val leida: Boolean = false,
+    @SerialName("created_at")    val createdAt: String = ""
 )

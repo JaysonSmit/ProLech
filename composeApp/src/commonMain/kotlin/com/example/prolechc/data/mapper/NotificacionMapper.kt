@@ -10,5 +10,6 @@ fun NotificacionDto.toDomain(): Notificacion = Notificacion(
     tipo        = tipo,
     icono       = icono,
     referenciaId = referenciaId,
-    createdAt   = createdAt
+    createdAt   = createdAt,
+    leida       = leida
 )

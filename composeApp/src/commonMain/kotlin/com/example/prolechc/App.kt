@@ -31,7 +31,7 @@ import org.koin.compose.koinInject
  * sin token muestra el login.
  */
 @Composable
-fun App() {
+fun App(abrirAvisos: Boolean = false) {
     val verificarSesion: VerificarSesionUseCase = koinInject()
     val estadoSesion: EstadoSesion = koinInject()
     val sesionVencida by estadoSesion.vencida.collectAsState()
@@ -61,7 +61,7 @@ fun App() {
                     onLoginExitoso = { logueado = true },
                     viewModel = koinViewModel(key = "login-$intentoLogin")
                 )
-                true  -> PantallaPrincipal(onSesionCerrada = {
+                true  -> PantallaPrincipal(abrirAvisos = abrirAvisos, onSesionCerrada = {
                     intentoLogin++
                     logueado = false
                 })

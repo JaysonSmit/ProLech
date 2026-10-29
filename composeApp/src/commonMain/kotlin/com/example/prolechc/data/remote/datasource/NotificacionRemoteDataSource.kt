@@ -9,8 +9,9 @@ import io.ktor.client.request.post
 
 class NotificacionRemoteDataSource(private val client: HttpClient) {
 
-    suspend fun getNotificaciones(): NotificacionesResponseDto =
-        client.get("${ApiConfig.BASE_URL}${ApiConfig.NOTIFICACIONES}").body()
+    /** [todas] = también las leídas (bandeja de avisos); si no, solo las no leídas. */
+    suspend fun getNotificaciones(todas: Boolean = false): NotificacionesResponseDto =
+        client.get("${ApiConfig.BASE_URL}${ApiConfig.NOTIFICACIONES}" + if (todas) "?todas=1" else "").body()
 
     suspend fun marcarLeida(id: Int) {
         client.post("${ApiConfig.BASE_URL}${ApiConfig.notificacionLeer(id)}")
