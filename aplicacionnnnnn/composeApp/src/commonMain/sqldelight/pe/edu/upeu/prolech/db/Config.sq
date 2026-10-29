@@ -1,0 +1,11 @@
+-- Ajustes locales de la app (p. ej. la URL del servidor Laravel).
+CREATE TABLE ConfigEntity (
+    clave TEXT NOT NULL PRIMARY KEY,
+    valor TEXT NOT NULL
+);
+
+obtenerConfig:
+SELECT valor FROM ConfigEntity WHERE clave = ?;
+
+guardarConfig:
+INSERT OR REPLACE INTO ConfigEntity(clave, valor) VALUES (?, ?);

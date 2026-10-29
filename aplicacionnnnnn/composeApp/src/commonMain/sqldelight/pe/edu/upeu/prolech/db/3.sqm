@@ -1,0 +1,5 @@
+-- Migración v3 → v4: errores de sincronización, grasa del Lactoscan y foto de evidencia.
+ALTER TABLE AcopioEntity ADD COLUMN errorSync TEXT;
+ALTER TABLE AcopioEntity ADD COLUMN grasa REAL;
+ALTER TABLE AcopioEntity ADD COLUMN fotoLocal TEXT;
+ALTER TABLE AcopioEntity ADD COLUMN fotoSubida INTEGER NOT NULL DEFAULT 0;

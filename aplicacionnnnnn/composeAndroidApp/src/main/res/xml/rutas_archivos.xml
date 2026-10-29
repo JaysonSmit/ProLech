@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Fotos de evidencia: carpeta privada persistente (se suben al recuperar señal) -->
+    <files-path name="evidencias" path="evidencias/" />
+    <!-- Tickets PDF temporales para compartir -->
+    <cache-path name="tickets" path="tickets/" />
+</paths>

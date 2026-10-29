@@ -1,0 +1,41 @@
+-- Recorrido GPS del chofer. Se guarda primero en el celular (funciona sin señal)
+-- y el SyncManager lo sube en lotes a /api/tracking/lote.
+CREATE TABLE PuntoGpsEntity (
+    id            INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    lat           REAL    NOT NULL,
+    lon           REAL    NOT NULL,
+    precisionM    REAL,
+    velocidadKmh  REAL,
+    registradoEn  INTEGER NOT NULL,
+    -- 0 = pendiente de subir, 1 = ya está en el servidor
+    enviado       INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_punto_registrado ON PuntoGpsEntity(registradoEn);
+
+insertarPunto:
+INSERT INTO PuntoGpsEntity(lat, lon, precisionM, velocidadKmh, registradoEn, enviado)
+VALUES (?, ?, ?, ?, ?, 0);
+
+puntosDesde:
+SELECT * FROM PuntoGpsEntity
+WHERE registradoEn >= ?
+ORDER BY registradoEn;
+
+pendientesDeEnvio:
+SELECT * FROM PuntoGpsEntity
+WHERE enviado = 0
+ORDER BY registradoEn
+LIMIT ?;
+
+marcarEnviados:
+UPDATE PuntoGpsEntity SET enviado = 1 WHERE id IN ?;
+
+contarPendientes:
+SELECT COUNT(*) FROM PuntoGpsEntity WHERE enviado = 0;
+
+borrarEnviadosAntesDe:
+DELETE FROM PuntoGpsEntity WHERE enviado = 1 AND registradoEn < ?;
+
+borrarTodosLosPuntos:
+DELETE FROM PuntoGpsEntity;

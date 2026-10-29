@@ -1,0 +1,15 @@
+-- Última respuesta de /api/mi-ruta: permite ver la ruta y el mapa sin señal.
+CREATE TABLE RutaCacheEntity (
+    id             INTEGER NOT NULL PRIMARY KEY,
+    json           TEXT    NOT NULL,
+    actualizadoEn  INTEGER NOT NULL
+);
+
+guardarRuta:
+INSERT OR REPLACE INTO RutaCacheEntity(id, json, actualizadoEn) VALUES (1, ?, ?);
+
+obtenerRuta:
+SELECT * FROM RutaCacheEntity WHERE id = 1;
+
+borrarRuta:
+DELETE FROM RutaCacheEntity;

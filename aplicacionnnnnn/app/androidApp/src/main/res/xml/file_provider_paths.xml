@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Directorio de caché interno — donde PdfBoletaService guarda los PDFs -->
+    <cache-path name="boletas" path="boletas/" />
+    <!-- Fotos de evidencia de leche rechazada (FotoEvidenciaService) -->
+    <cache-path name="evidencias" path="evidencias/" />
+</paths>
