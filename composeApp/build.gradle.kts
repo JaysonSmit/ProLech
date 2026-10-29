@@ -20,6 +20,9 @@ kotlin {
 
         compilerOptions { jvmTarget = JvmTarget.JVM_11 }
 
+        // Empaqueta los composeResources (logo de la pantalla de carga) en el APK
+        androidResources { enable = true }
+
         // Tests de commonTest en la JVM (src/androidHostTest)
         withHostTest { }
     }
@@ -131,4 +134,10 @@ sqldelight {
             packageName.set("pe.edu.upeu.prolech.db")
         }
     }
+}
+
+// Recursos de Compose (logo de la pantalla de carga): clase Res con un paquete fijo
+compose.resources {
+    packageOfResClass = "com.example.prolechc.recursos"
+    generateResClass = always
 }

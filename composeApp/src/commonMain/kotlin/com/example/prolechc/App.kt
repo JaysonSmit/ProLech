@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import com.example.prolechc.data.local.EstadoSesion
 import com.example.prolechc.domain.usecase.VerificarSesionUseCase
 import org.koin.compose.viewmodel.koinViewModel
+import com.example.prolechc.presentation.PantallaCarga
 import com.example.prolechc.presentation.PantallaPrincipal
 import com.example.prolechc.presentation.login.LoginScreen
 import com.example.prolechc.presentation.theme.ProLechTema
@@ -39,6 +40,12 @@ fun App(abrirAvisos: Boolean = false) {
     // Cada vez que se muestra el login se usa un ViewModel nuevo: el anterior quedaba
     // con exitoso = true y, tras "Salir", volvía a entrar sin pedir la contraseña.
     var intentoLogin by remember { mutableIntStateOf(0) }
+    // Pantalla de carga con el logo: se muestra al menos un momento aunque la sesión cargue rápido
+    var splashVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(1_600)
+        splashVisible = false
+    }
 
     LaunchedEffect(Unit) {
         logueado = verificarSesion()
@@ -53,10 +60,8 @@ fun App(abrirAvisos: Boolean = false) {
 
     ProLechTema {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            when (logueado) {
-                null  -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
+            when (if (splashVisible) null else logueado) {
+                null  -> PantallaCarga()
                 false -> LoginScreen(
                     onLoginExitoso = { logueado = true },
                     viewModel = koinViewModel(key = "login-$intentoLogin")
