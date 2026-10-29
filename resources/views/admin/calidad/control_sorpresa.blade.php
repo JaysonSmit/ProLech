@@ -133,17 +133,25 @@
 </div>
 
 <div class="cs-panel" id="semaforo" style="margin-bottom:16px">
-    <h3>🚦 Semáforo de ganaderos <small>señales de los últimos 21 días · verde 0–2 · amarillo 3–5 · rojo 6+</small></h3>
+    <h3>🚦 Semáforo de ganaderos <small>últimos 21 días · observación del chofer +2 · acopio observado +3 / rechazado +4 · muestra leve +3 / grave +6 · verde 0–2 · amarillo 3–5 · rojo 6+</small></h3>
     <div class="table-wrap"><table>
-        <thead><tr><th>Ganadero</th><th>Ruta</th><th>Semáforo</th><th>Motivos</th><th>Último control</th><th></th></tr></thead>
+        <thead><tr><th>Ganadero</th><th>Ruta</th><th>Semáforo</th><th>Por qué</th><th>Última entrega</th><th>Último control</th><th></th></tr></thead>
         <tbody>
         @foreach($semaforo as $s)
             <tr>
                 <td><strong>{{ $s['ganadero']->nombre }}</strong>
                     @if($s['ganadero']->entregas_bloqueadas)<span class="cs-pill" style="background:#fee2e2;color:#b91c1c">bloqueado</span>@endif</td>
                 <td style="font-size:.82rem">{{ $s['ganadero']->zona?->nombre ?? '—' }}</td>
-                <td><span class="cs-pill" style="background:{{ $colorNivel[$s['nivel']][0] }};color:{{ $colorNivel[$s['nivel']][1] }}">● {{ ucfirst($s['nivel']) }} · {{ $s['puntaje'] }}</span></td>
-                <td style="font-size:.78rem;color:var(--text-muted)">{{ implode(' · ', $s['motivos']) ?: '—' }}</td>
+                <td style="white-space:nowrap"><span class="cs-pill" style="background:{{ $colorNivel[$s['nivel']][0] }};color:{{ $colorNivel[$s['nivel']][1] }}">● {{ ucfirst($s['nivel']) }} · {{ $s['puntaje'] }}</span></td>
+                <td style="font-size:.74rem;max-width:280px">
+                    @forelse($s['motivos'] as $m)<span class="cs-pill" style="background:#f1f5f9;color:#334155;margin:1px 2px 1px 0;display:inline-block">{{ $m }}</span>@empty<span style="color:var(--text-muted)">Sin señales</span>@endforelse
+                </td>
+                <td style="font-size:.8rem;white-space:nowrap">
+                    @if($u = $s['ultima_entrega'])
+                        {{ \Carbon\Carbon::parse($u->fecha)->format('d/m') }} · {{ number_format($u->litros, 1) }} L
+                        <span class="badge badge-{{ $u->estado }}" style="font-size:.65rem">{{ ucfirst($u->estado) }}</span>
+                    @else <span style="color:var(--text-muted)">—</span> @endif
+                </td>
                 <td style="font-size:.8rem">{{ $s['ultimo_control']?->format('d/m/Y') ?? 'Nunca' }}</td>
                 <td style="white-space:nowrap">
                     <button type="button" class="cs-btn" style="padding:4px 8px;font-size:.72rem" onclick="csProgramar({{ $s['ganadero']->id }})">📌 Control</button>

@@ -94,7 +94,11 @@ class AdminDashboardController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        return view('admin.dashboard', compact('stats', 'acopiosRecientes', 'adulteracionesHoy', 'acopiosSinBalde'));
+        $calidad = app(\App\Services\ControlCalidadService::class);
+        $riesgos = $acopiosRecientes->pluck('ganadero')->filter()->unique('id')
+            ->mapWithKeys(fn ($g) => [$g->id => $calidad->riesgo($g)]);
+
+        return view('admin.dashboard', compact('stats', 'acopiosRecientes', 'adulteracionesHoy', 'acopiosSinBalde', 'riesgos'));
     }
 
     // ──────────────────────────────────────────────────────────────────────────

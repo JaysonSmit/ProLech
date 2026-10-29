@@ -52,9 +52,19 @@ class ControlCalidadService
         foreach ($obs as $o) $puntaje += 2 * $peso($o->fecha);
         if ($obs->count()) $motivos[] = $obs->count() . ' observación(es) del chofer';
 
-        $leves = ControlCalidad::where('ganadero_id', $g->id)->where('resultado', 'leve')->whereDate('fecha', '>=', $desde)->get(['fecha']);
-        foreach ($leves as $l) $puntaje += 3 * $peso($l->fecha);
-        if ($leves->count()) $motivos[] = $leves->count() . ' muestra(s) leve(s)';
+        // Lecturas del Lactoscan en la planta: observado +3, rechazado +4
+        $malas = Acopio::where('ganadero_id', $g->id)->whereDate('fecha', '>=', $desde)
+            ->whereIn('estado', ['observado', 'rechazado'])->get(['fecha', 'estado', 'porcentaje_agua']);
+        foreach ($malas as $m) $puntaje += ($m->estado === 'rechazado' ? 4 : 3) * $peso($m->fecha);
+        if ($malas->count()) {
+            $motivos[] = $malas->count() . ' acopio(s) ' . ($malas->contains('estado', 'rechazado') ? 'observado(s)/rechazado(s)' : 'observado(s)')
+                . ' · máx. ' . number_format((float) $malas->max('porcentaje_agua'), 1) . ' % agua';
+        }
+
+        $controles = ControlCalidad::where('ganadero_id', $g->id)->whereIn('resultado', ['leve', 'grave'])->whereDate('fecha', '>=', $desde)->get(['fecha', 'resultado']);
+        foreach ($controles as $c) $puntaje += ($c->resultado === 'grave' ? 6 : 3) * $peso($c->fecha);
+        if ($n = $controles->where('resultado', 'leve')->count()) $motivos[] = "{$n} muestra(s) leve(s)";
+        if ($n = $controles->where('resultado', 'grave')->count()) $motivos[] = "{$n} muestra(s) grave(s)";
 
         // Litros de la última semana contra el promedio de las dos anteriores
         $reciente = (float) Acopio::where('ganadero_id', $g->id)->whereDate('fecha', '>=', today()->subDays(6))->avg('litros');
@@ -65,7 +75,9 @@ class ControlCalidadService
         }
 
         $puntaje = round($puntaje, 1);
+        $ultima = Acopio::where('ganadero_id', $g->id)->latest('fecha')->latest('id')->first(['fecha', 'litros', 'estado', 'porcentaje_agua']);
         return [
+            'ultima_entrega' => $ultima,
             'puntaje'        => $puntaje,
             'nivel'          => $puntaje >= 6 ? 'rojo' : ($puntaje >= 3 ? 'amarillo' : 'verde'),
             'motivos'        => $motivos,
