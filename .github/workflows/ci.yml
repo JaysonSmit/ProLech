@@ -1,0 +1,40 @@
+# Integración continua del monorepo ProLech: pruebas del backend Laravel y de la app KMP
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend Laravel (PHPUnit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: prolech-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: mbstring, pdo_sqlite, gd, zip
+      - run: composer install --no-interaction --prefer-dist
+      - run: cp .env.example .env && php artisan key:generate
+      - run: php artisan test
+
+  app:
+    name: App KMP (kotlin.test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aplicacionnnnnn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew && ./gradlew :composeApp:testAndroidHostTest --no-daemon
